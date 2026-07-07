@@ -73,13 +73,108 @@ button:hover {
 }
 
 /* Dashboard Container Specifics */
+.dashboard-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 24px;
+    align-items: start;
+}
+
+.dashboard-main {
+    min-width: 0;
+}
+
 .dashboard-container { 
-    max-width: 800px; 
+    max-width: none; 
+    width: 100%; 
     background: var(--color-bg-card); 
     padding: 25px; 
     border-radius: 8px; 
     box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
     margin: 0 auto; 
+    box-sizing: border-box;
+}
+
+.dashboard-toolbar {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 20px;
+}
+
+.filter-panel {
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid var(--color-border-light);
+    border-radius: 8px;
+    padding: 18px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    position: sticky;
+    top: 20px;
+}
+
+.filter-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.filter-panel h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--color-text-primary);
+}
+
+.filter-group {
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--color-border-lighter);
+}
+
+.filter-group:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+
+.filter-group-title {
+    display: block;
+    font-weight: bold;
+    color: var(--color-text-secondary);
+    margin-bottom: 8px;
+}
+
+.filter-control {
+    display: block;
+    margin-bottom: 10px;
+}
+
+.filter-control span {
+    display: block;
+    font-size: 0.92rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 5px;
+}
+
+.filter-operator-row {
+    display: grid;
+    grid-template-columns: 78px 1fr;
+    gap: 8px;
+}
+
+.btn-secondary {
+    background-color: #f1f2f6;
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+    padding: 8px 12px;
+    width: auto;
+    margin-top: 0;
+    font-size: 0.95rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-secondary:hover {
+    background-color: #e5e7eb;
 }
 
 /* Form Container Specifics */
