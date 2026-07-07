@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 EXCEL_PATH = os.getenv(
     "EXCEL_PATH",
-    r"C:\Users\EthanSanders\Box\TWG\Other\TWG Laser Scanning\Scan Data Job Reports\Regression Model\Regression_Model_Dataset.xlsx"
+    r"data\Scan_Log_Dataset.xlsx"
 )
 
 
