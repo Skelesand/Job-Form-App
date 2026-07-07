@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+
+{% block title %}Job Completion Log{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <h2>Scan Job Log</h2>
+    <div class="subtitle">Search/select an existing project to overwrite it, or type a new one to create it.</div>
+    <form action="/submit" method="POST">
+        
+        <label for="project_name">Project Name / ID:</label>
+        <div class="autocomplete-container">
+            <input type="text" id="project_name" name="project_name" required placeholder="Click to view list / Type to search..." autocomplete="off">
+            
+            <div id="custom_dropdown" class="dropdown-menu">
+                {% for project in projects %}
+                    <div class="dropdown-item" data-value="{{ project }}">{{ project }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <label for="project_type">Project Type</label>
+        <select id="project_type" name="project_type" required>
+            <option value="" disabled selected>Select a project type...</option>
+            <option value="Area">Area</option>
+            <option value="Building">Building</option>
+            <option value="Feature">Feature</option>
+            <option value="Other">Other</option>
+        </select>
+        
+        <label for="sector">Sector</label>
+        <select id="sector" name="sector" required>
+            <option value="" disabled selected>Select a sector...</option>
+            <option value="Commercial">Commercial</option>
+            <option value="Industrial">Industrial</option>
+            <option value="Medical">Medical</option>
+            <option value="Office">Office</option>
+            <option value="Residential">Residential</option>
+            <option value="Other">Other</option>
+        </select>
+
+        <label for="sqft">Square footage:</label>
+        <input type="number" id="sqft" name="sqft" required min="1">
+
+        <label for="levels">Levels:</label>
+        <input type="number" id="levels" name="levels" required min="1">
+
+        <label for="partition_density">Partition Density:</label>
+        <input type="number" id="partition_density" name="partition_density" required min="0">
+
+        <label for="site_condition">Site Condition</label>
+        <select id="site_condition" name="site_condition" required>
+            <option value="" disabled selected>Select a site condition...</option>
+            <option value="1">Empty/Near Empty</option>
+            <option value="2">Light Clutter</option>
+            <option value="3">Heavy Clutter</option>
+        </select>
+
+        <label for="interior">Interior Scanned?</label>
+        <select id="interior" name="interior" required>
+            <option value="" disabled selected>Yes or No</option>
+            <option value="y">Yes</option>
+            <option value="n">No</option>
+        </select>
+
+        <label for="exterior">Exterior Scanned?</label>
+        <select id="exterior" name="exterior" required>
+            <option value="" disabled selected>Yes or No</option>
+            <option value="y">Yes</option>
+            <option value="n">No</option>
+        </select>
+
+        <label for="roof">Roof Scanned?</label>
+        <select id="roof" name="roof" required>
+            <option value="" disabled selected>Yes or No</option>
+            <option value="y">Yes</option>
+            <option value="n">No</option>
+        </select>
+
+        <label for="coverage">Coverage</label>
+        <input type="number" step=".01" id="coverage" name="coverage" required min="0" max="1">
+ 
+        <label for="scan_count">Total Scans Completed:</label>
+        <input type="number" id="scan_count" name="scan_count" required min="1">
+
+        <button type="submit">Submit Job Data</button>
+    </form>
+</div>
+
+<script>
+    const input = document.getElementById('project_name');
+    const dropdown = document.getElementById('custom_dropdown');
+    const items = dropdown.getElementsByClassName('dropdown-item');
+
+    // Show dropdown when input is clicked or focused
+    input.addEventListener('focus', () => {
+        dropdown.style.display = 'block';
+        filterDropdown(); 
+    });
+
+    // Filter list as the user types
+    input.addEventListener('input', filterDropdown);
+
+    function filterDropdown() {
+        const filter = input.value.toLowerCase();
+        let hasVisibleItems = false;
+
+        for (let i = 0; i < items.length; i++) {
+            const txtValue = items[i].textContent || items[i].innerText;
+            if (txtValue.toLowerCase().indexOf(filter) > -1) {
+                items[i].style.display = "";
+                hasVisibleItems = true;
+            } else {
+                items[i].style.display = "none";
+            }
+        }
+        dropdown.style.display = hasVisibleItems ? 'block' : 'none';
+    }
+
+    // Select item on click
+    dropdown.addEventListener('click', (e) => {
+        if (e.target.classList.contains('dropdown-item')) {
+            const selectedProject = e.target.getAttribute('data-value');
+            input.value = selectedProject;
+            dropdown.style.display = 'none';
+            
+            // Fetch and autofill data for the selected project
+            fetchProjectData(selectedProject);
+        }
+    });
+
+    // If they finish typing an exact match manually and clear focus, attempt fetch
+    input.addEventListener('blur', () => {
+        setTimeout(() => {
+            if (input.value) {
+                fetchProjectData(input.value);
+            }
+        }, 200);
+    });
+
+    // Close dropdown if user clicks outside of the container
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.autocomplete-container')) {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    // Worker function to hit the Flask API and change form field values
+    function fetchProjectData(projectName) {
+        if (!projectName) return;
+
+        fetch(`/get_project_data?name=${encodeURIComponent(projectName)}`)
+            .then(response => response.json())
+            .then(res => {
+                if (res.success) {
+                    const data = res.data;
+                    
+                    // Match object properties directly to HTML elements IDs
+                    document.getElementById('project_type').value = data.project_type;
+                    document.getElementById('sector').value = data.sector;
+                    document.getElementById('sqft').value = data.sqft;
+                    document.getElementById('levels').value = data.levels;
+                    document.getElementById('partition_density').value = data.partition_density;
+                    document.getElementById('site_condition').value = data.site_condition;
+                    document.getElementById('interior').value = data.interior;
+                    document.getElementById('exterior').value = data.exterior;
+                    document.getElementById('roof').value = data.roof;
+                    document.getElementById('coverage').value = data.coverage;
+                    document.getElementById('scan_count').value = data.scan_count;
+                } else {
+                    console.log("New project entry detected. Leaving remaining form fields blank.");
+                }
+            })
+            .catch(err => console.error("Error fetching project data:", err));
+    }
+
+    // Auto-load project from URL parameter if present
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const projectParam = urlParams.get('project');
+        if (projectParam) {
+            input.value = projectParam;
+            fetchProjectData(projectParam);
+        }
+    });
+</script>
+{% endblock %}

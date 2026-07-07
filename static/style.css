@@ -1,0 +1,320 @@
+/* CSS Custom Properties for Colors */
+:root {
+    --color-primary-orange: #ffae00;
+    --color-primary-orange-dark: #ca7900;
+    --color-danger: #e74c3c;
+    --color-danger-dark: #c0392b;
+    --color-text-primary: #333;
+    --color-text-secondary: #555;
+    --color-text-light: #666;
+    --color-text-lighter: #888;
+    --color-bg-light: #f5f6fa;
+    --color-bg-card: rgba(230, 228, 224, 0.95);
+    --color-border: #ccc;
+    --color-border-light: #eee;
+    --color-border-lighter: #f0f0f0;
+}
+
+/* Shared Global Styles */
+body { 
+    font-family: Arial, sans-serif; 
+    background-color: #25252373; 
+    color: var(--color-text-primary); 
+}
+
+h2 { 
+    text-align: center; 
+    color: var(--color-text-primary); 
+    margin-bottom: 5px; 
+}
+
+.subtitle { 
+    text-align: center; 
+    color: var(--color-text-light); 
+    font-size: 14px; 
+    margin-bottom: 25px; 
+}
+
+/* Button & Action Styles */
+.btn-container { 
+    text-align: right; 
+    margin-bottom: 20px; 
+}
+
+.btn { 
+    background-color: var(--color-primary-orange); 
+    color: white; 
+    text-decoration: none; 
+    padding: 10px 20px; 
+    font-weight: bold; 
+    border-radius: 4px; 
+    display: inline-block; 
+}
+
+.btn:hover { 
+    background-color: var(--color-primary-orange-dark); 
+}
+
+button { 
+    width: 100%; 
+    background-color: var(--color-primary-orange); 
+    color: white; 
+    border: none; 
+    padding: 12px; 
+    margin-top: 25px; 
+    font-size: 16px; 
+    border-radius: 4px; 
+    cursor: pointer; 
+    font-weight: bold; 
+}
+
+button:hover { 
+    background-color: var(--color-primary-orange-dark); 
+}
+
+/* Dashboard Container Specifics */
+.dashboard-container { 
+    max-width: 800px; 
+    background: var(--color-bg-card); 
+    padding: 25px; 
+    border-radius: 8px; 
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+    margin: 0 auto; 
+}
+
+/* Form Container Specifics */
+.form-container { 
+    max-width: 500px; 
+    background: var(--color-bg-card); 
+    padding: 25px; 
+    border-radius: 8px; 
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+    margin: 0 auto; 
+}
+
+.form-container h2 {
+    color: var(--color-text-primary);
+}
+
+.form-container .subtitle {
+    color: var(--color-text-light);
+    margin-bottom: 20px;
+}
+
+label { 
+    font-weight: bold; 
+    display: block; 
+    margin-top: 15px; 
+    color: var(--color-text-secondary); 
+}
+
+input, select { 
+    width: 100%; 
+    padding: 10px; 
+    margin-top: 5px; 
+    box-sizing: border-box; 
+    border: 1px solid var(--color-border); 
+    border-radius: 4px; 
+    font-size: 16px; 
+}
+
+/* Accordion Setup */
+details { 
+    background: #fff; 
+    border: 1px solid var(--color-border); 
+    border-radius: 4px; 
+    margin-bottom: 12px; 
+    padding: 10px; 
+    transition: background 0.3s ease; 
+}
+
+details[open] { 
+    background: #fdfdfd; 
+    border-color: var(--color-primary-orange); 
+}
+
+summary { 
+    font-size: 17px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    outline: none; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+}
+
+summary::-webkit-details-marker { 
+    display: none; 
+}
+
+.timestamp-badge { 
+    font-size: 12px; 
+    color: var(--color-text-lighter); 
+    font-weight: normal; 
+}
+
+.project-details { 
+    margin-top: 15px; 
+    border-top: 1px solid var(--color-border-light); 
+    padding-top: 10px; 
+}
+
+.grid { 
+    display: grid; 
+    grid-template-columns: repeat(2, 1fr); 
+    gap: 10px 20px; 
+}
+
+.grid-item { 
+    font-size: 14px; 
+    line-height: 1.5; 
+}
+
+.grid-item strong { 
+    color: var(--color-text-secondary); 
+}
+
+/* Card Action Buttons */
+.card-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    justify-content: space-between;
+}
+
+.btn-delete,
+.btn-edit {
+    flex: 1;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.btn-delete {
+    background-color: var(--color-danger);
+    color: white;
+}
+
+.btn-delete:hover {
+    background-color: var(--color-danger-dark);
+}
+
+.btn-edit {
+    background-color: var(--color-primary-orange);
+    color: white;
+}
+
+.btn-edit:hover {
+    background-color: var(--color-primary-orange-dark);
+}
+
+.no-data { 
+    text-align: center; 
+    color: var(--color-text-light); 
+    font-style: italic; 
+    padding: 20px; 
+}
+
+/* Custom Scrollable Dropdown Styling */
+.autocomplete-container { 
+    position: relative; 
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid var(--color-border);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.dropdown-item {
+    padding: 10px;
+    cursor: pointer;
+    font-size: 15px;
+    border-bottom: 1px solid var(--color-border-lighter);
+}
+
+.dropdown-item:hover { 
+    background-color: #f4f6f9; 
+}
+
+.dropdown-item:last-child { 
+    border-bottom: none; 
+}
+
+/* Sidebar Layout Mechanics */
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+.app-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr; /* Sidebar width, rest goes to content */
+    min-height: 100vh;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    background-color: #1d1c1b;
+    color: #ecf0f1;
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    
+    /* Sticky sidebar fixes */
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    box-sizing: border-box;
+    overflow-y: auto; 
+}
+
+.sidebar-brand {
+    font-size: 1.25rem;
+    font-weight: bold;
+    text-align: center;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--color-primary-orange-dark);
+    margin-bottom: 20px;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.nav-item {
+    color: #bdc3c7;
+    text-decoration: none;
+    padding: 12px 20px;
+    transition: all 0.2s ease;
+    font-family: sans-serif;
+}
+
+.nav-item:hover {
+    background-color: var(--color-primary-orange-dark);
+    color: #ffffff;
+}
+
+/* Main Content Wrapper padding adjustment */
+.main-content {
+    padding: 30px;
+    background-color: var(--color-bg-light);
+    box-sizing: border-box;
+}

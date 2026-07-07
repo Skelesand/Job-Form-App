@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+
+{% block title %}Scan Data Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <h2>Scan Data Dashboard</h2>
+    <div class="subtitle">Overview of all logged projects</div>
+
+    <div class="btn-container" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+        <a href="/form" class="btn" style="white-space: nowrap;">+ Add / Update Project</a>
+        <!-- Text Search Bar -->
+        <input type="text" id="dashboard_search" placeholder="Type to filter projects by name..." autocomplete="off" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+    </div>
+
+    <!-- Feature Toggles/Filters -->
+    <div class="filter-container" style="display: flex; gap: 20px; margin-bottom: 20px; padding: 10px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee; font-family: sans-serif; size: 0.9em;">
+        <span style="font-weight: bold; color: #555;">Filter by Features:</span>
+        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+            <input type="checkbox" id="filter_interior" class="feature-filter"> Interior Scanned
+        </label>
+        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+            <input type="checkbox" id="filter_exterior" class="feature-filter"> Exterior Scanned
+        </label>
+        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+            <input type="checkbox" id="filter_roof" class="feature-filter"> Roof Scanned
+        </label>
+    </div>
+
+    {% if jobs %}
+        <div id="projects_list">
+            {% for job in jobs %}
+                <!-- Added data attributes here for easy JS filtering -->
+                <details class="project-card" 
+                         data-interior="{{ job.interior }}" 
+                         data-exterior="{{ job.exterior }}" 
+                         data-roof="{{ job.roof }}">
+                    <summary>
+                        <span>{{ job.project_name }}</span>
+                        <span class="timestamp-badge">Updated: {{ job.timestamp }}</span>
+                    </summary>
+                    <div class="project-details">
+                        <div class="grid">
+                            <div class="grid-item"><strong>Project Type:</strong> {{ job.project_type }}</div>
+                            <div class="grid-item"><strong>Sector:</strong> {{ job.sector }}</div>
+                            <div class="grid-item"><strong>Square Footage:</strong> {{ job.sqft }} sqft</div>
+                            <div class="grid-item"><strong>Levels:</strong> {{ job.levels }}</div>
+                            <div class="grid-item"><strong>Partition Density:</strong> {{ job.partition_density }}</div>
+                            <div class="grid-item"><strong>Site Condition:</strong> 
+                                {% if job.site_condition|string == "1" %}Empty/Near Empty
+                                {% elif job.site_condition|string == "2" %}Light Clutter
+                                {% elif job.site_condition|string == "3" %}Heavy Clutter
+                                {% else %}{{ job.site_condition }}{% endif %}
+                            </div>
+                            <div class="grid-item"><strong>Interior Scanned:</strong> {{ 'Yes' if job.interior == 'y' else 'No' if job.interior == 'n' else job.interior }}</div>
+                            <div class="grid-item"><strong>Exterior Scanned:</strong> {{ 'Yes' if job.exterior == 'y' else 'No' if job.exterior == 'n' else job.exterior }}</div>
+                            <div class="grid-item"><strong>Roof Scanned:</strong> {{ 'Yes' if job.roof == 'y' else 'No' if job.roof == 'n' else job.roof }}</div>
+                            <div class="grid-item"><strong>Coverage:</strong> {{ "%.0f"|format(job.coverage|float * 100) }}%</div>
+                            <div class="grid-item"><strong>Total Scans:</strong> {{ job.scan_count }}</div>
+                        </div>
+                        <div class="card-actions">
+                            <button class="btn-delete" onclick="deleteJob('{{ job.project_name }}', this)">Delete Project</button>
+                            <button class="btn-edit" onclick="editJob('{{ job.project_name }}')">Edit Project</button>
+                        </div>
+                    </div>
+                </details>
+            {% endfor %}
+        </div>
+        <!-- Element to show when no projects match the combined filters -->
+        <div id="no_match_message" class="no-data" style="display: none;">No matching projects found.</div>
+    {% else %}
+        <div class="no-data">No logged project entries found in the spreadsheet data pool.</div>
+    {% endif %}
+</div>
+
+<script>
+    const searchInput = document.getElementById('dashboard_search');
+    const interiorCheckbox = document.getElementById('filter_interior');
+    const exteriorCheckbox = document.getElementById('filter_exterior');
+    const roofCheckbox = document.getElementById('filter_roof');
+    const projectCards = document.querySelectorAll('.project-card');
+    const noMatchMessage = document.getElementById('no_match_message');
+
+    function filterProjects() {
+        const textFilter = searchInput ? searchInput.value.toLowerCase() : '';
+        const requireInterior = interiorCheckbox ? interiorCheckbox.checked : false;
+        const requireExterior = exteriorCheckbox ? exteriorCheckbox.checked : false;
+        const requireRoof = roofCheckbox ? roofCheckbox.checked : false;
+        
+        let visibleCount = 0;
+
+        projectCards.forEach(card => {
+            // 1. Text Search Filter
+            const projectNameSpan = card.querySelector('summary span:first-child');
+            const projectName = projectNameSpan ? (projectNameSpan.textContent || projectNameSpan.innerText).toLowerCase() : '';
+            const matchesText = projectName.indexOf(textFilter) > -1;
+
+            // 2. Feature Toggle Filters (checks if data attribute matches 'y')
+            const matchesInterior = !requireInterior || card.getAttribute('data-interior') === 'y';
+            const matchesExterior = !requireExterior || card.getAttribute('data-exterior') === 'y';
+            const matchesRoof = !requireRoof || card.getAttribute('data-roof') === 'y';
+
+            // Combine all filter checks
+            if (matchesText && matchesInterior && matchesExterior && matchesRoof) {
+                card.style.display = "";
+                visibleCount++;
+            } else {
+                card.style.display = "none";
+                card.removeAttribute('open'); // Close details if hidden
+            }
+        });
+
+        // Toggle "No matching projects found" message
+        if (visibleCount === 0 && (textFilter !== '' || requireInterior || requireExterior || requireRoof)) {
+            noMatchMessage.style.display = 'block';
+        } else {
+            noMatchMessage.style.display = 'none';
+        }
+    }
+
+    // Attach listeners to both the text input and checkboxes
+    if (searchInput) searchInput.addEventListener('input', filterProjects);
+    if (interiorCheckbox) interiorCheckbox.addEventListener('change', filterProjects);
+    if (exteriorCheckbox) exteriorCheckbox.addEventListener('change', filterProjects);
+    if (roofCheckbox) roofCheckbox.addEventListener('change', filterProjects);
+
+    // Delete job function
+    function deleteJob(projectName, buttonElement) {
+        const confirmed = confirm(`Are you sure you want to delete "${projectName}"? This action cannot be undone.`);
+        if (!confirmed) return;
+
+        fetch('/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ project_name: projectName })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Job deleted successfully!');
+                // Remove the card from the DOM
+                const card = buttonElement.closest('.project-card');
+                card.remove();
+                // Recount visible items
+                filterProjects();
+            } else {
+                alert('Error deleting job: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            alert('Error deleting job. Please try again.');
+        });
+    }
+
+    // Edit job function - redirect to form with project name
+    function editJob(projectName) {
+        // Redirect to form page with project name parameter
+        window.location.href = `/form?project=${encodeURIComponent(projectName)}`;
+    }
+</script>
+{% endblock %}
