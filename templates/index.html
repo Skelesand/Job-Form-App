@@ -93,107 +93,19 @@
             </div>
 
             <div class="filter-group">
-                <div class="filter-group-title">Feature Filters</div>
-                <label class="filter-control">
-                    <span>Interior Scanned</span>
-                    <select id="filter_interior">
-                        <option value="any">Any</option>
-                        <option value="included">Included</option>
-                        <option value="excluded">Excluded</option>
-                    </select>
-                </label>
-                <label class="filter-control">
-                    <span>Exterior Scanned</span>
-                    <select id="filter_exterior">
-                        <option value="any">Any</option>
-                        <option value="included">Included</option>
-                        <option value="excluded">Excluded</option>
-                    </select>
-                </label>
-                <label class="filter-control">
-                    <span>Roof Scanned</span>
-                    <select id="filter_roof">
-                        <option value="any">Any</option>
-                        <option value="included">Included</option>
-                        <option value="excluded">Excluded</option>
-                    </select>
-                </label>
+                <div class="filter-section-header">
+                    <div class="filter-group-title">Feature Filters</div>
+                    <button type="button" id="add_feature_filter" class="btn-secondary btn-small">+ Add</button>
+                </div>
+                <div id="feature_filter_rows"></div>
             </div>
 
             <div class="filter-group">
-                <div class="filter-group-title">Numeric Filters</div>
-                <label class="filter-control">
-                    <span>Square Footage</span>
-                    <div class="filter-operator-row">
-                        <select id="filter_sqft_operator">
-                            <option value="any">Any</option>
-                            <option value="lt">&lt;</option>
-                            <option value="eq">=</option>
-                            <option value="gt">&gt;</option>
-                        </select>
-                        <input type="number" id="filter_sqft_value" step="1" placeholder="Value">
-                    </div>
-                </label>
-                <label class="filter-control">
-                    <span>Levels</span>
-                    <div class="filter-operator-row">
-                        <select id="filter_levels_operator">
-                            <option value="any">Any</option>
-                            <option value="lt">&lt;</option>
-                            <option value="eq">=</option>
-                            <option value="gt">&gt;</option>
-                        </select>
-                        <input type="number" id="filter_levels_value" step="1" placeholder="Value">
-                    </div>
-                </label>
-                <label class="filter-control">
-                    <span>Partition Density</span>
-                    <div class="filter-operator-row">
-                        <select id="filter_partition_density_operator">
-                            <option value="any">Any</option>
-                            <option value="lt">&lt;</option>
-                            <option value="eq">=</option>
-                            <option value="gt">&gt;</option>
-                        </select>
-                        <input type="number" id="filter_partition_density_value" step="1" placeholder="Value">
-                    </div>
-                </label>
-                <label class="filter-control">
-                    <span>Site Condition</span>
-                    <div class="filter-operator-row">
-                        <select id="filter_site_condition_operator">
-                            <option value="any">Any</option>
-                            <option value="lt">&lt;</option>
-                            <option value="eq">=</option>
-                            <option value="gt">&gt;</option>
-                        </select>
-                        <input type="number" id="filter_site_condition_value" step="1" placeholder="Value">
-                    </div>
-                </label>
-                <label class="filter-control">
-                    <span>Coverage (%)</span>
-                    <div class="filter-operator-row">
-                        <select id="filter_coverage_operator">
-                            <option value="any">Any</option>
-                            <option value="lt">&lt;</option>
-                            <option value="eq">=</option>
-                            <option value="gt">&gt;</option>
-                        </select>
-                        <input type="number" id="filter_coverage_value" step="1" placeholder="Value">
-                    </div>
-                </label>
-                <label class="filter-control">
-                    <span>Total Scans</span>
-                    <div class="filter-operator-row">
-                        <select id="filter_scan_count_operator">
-                            <option value="any">Any</option>
-                            <option value="lt">&lt;</option>
-                            <option value="eq">=</option>
-                            <option value="gt">&gt;</option>
-                        </select>
-                        <input type="number" id="filter_scan_count_value" step="1" placeholder="Value">
-                    </div>
-                </label>
+                <div class="filter-section-header">
+                    <div class="filter-group-title">Numeric Filters</div>
+                    <button type="button" id="add_numeric_filter" class="btn-secondary btn-small">+ Add</button>
+                </div>
+                <div id="numeric_filter_rows"></div>
             </div>
         </aside>
 
@@ -211,26 +123,30 @@
     const projectTypeInput = document.getElementById('filter_project_type');
     const sectorInput = document.getElementById('filter_sector');
     const clearFiltersButton = document.getElementById('clear_filters');
+    const addFeatureButton = document.getElementById('add_feature_filter');
+    const addNumericButton = document.getElementById('add_numeric_filter');
+    const featureFilterRows = document.getElementById('feature_filter_rows');
+    const numericFilterRows = document.getElementById('numeric_filter_rows');
     const projectCards = Array.from(document.querySelectorAll('.project-card'));
     const noMatchMessage = document.getElementById('no_match_message');
 
-    const booleanFilters = [
-        { id: 'filter_interior', dataKey: 'interior' },
-        { id: 'filter_exterior', dataKey: 'exterior' },
-        { id: 'filter_roof', dataKey: 'roof' }
-    ];
+    const featureFieldMap = {
+        interior: 'interior',
+        exterior: 'exterior',
+        roof: 'roof'
+    };
 
-    const numericFilters = [
-        { operatorId: 'filter_sqft_operator', valueId: 'filter_sqft_value', dataKey: 'sqft' },
-        { operatorId: 'filter_levels_operator', valueId: 'filter_levels_value', dataKey: 'levels' },
-        { operatorId: 'filter_partition_density_operator', valueId: 'filter_partition_density_value', dataKey: 'partition-density' },
-        { operatorId: 'filter_site_condition_operator', valueId: 'filter_site_condition_value', dataKey: 'site-condition' },
-        { operatorId: 'filter_coverage_operator', valueId: 'filter_coverage_value', dataKey: 'coverage', transform: value => value * 100 },
-        { operatorId: 'filter_scan_count_operator', valueId: 'filter_scan_count_value', dataKey: 'scan-count' }
-    ];
+    const numericFieldMap = {
+        sqft: { dataKey: 'sqft' },
+        levels: { dataKey: 'levels' },
+        partition_density: { dataKey: 'partition-density' },
+        site_condition: { dataKey: 'site-condition' },
+        coverage: { dataKey: 'coverage', transform: value => value * 100 },
+        scan_count: { dataKey: 'scan-count' }
+    };
 
     function getBooleanMatch(card, dataKey, selectedValue) {
-        if (selectedValue === 'any') {
+        if (!selectedValue) {
             return true;
         }
 
@@ -240,7 +156,7 @@
     }
 
     function getNumericMatch(card, dataKey, operator, rawValue, transform) {
-        if (!rawValue || operator === 'any') {
+        if (!operator || rawValue === '') {
             return true;
         }
 
@@ -272,20 +188,100 @@
         }
     }
 
+    function addFeatureFilterRow() {
+        if (!featureFilterRows) return;
+
+        const row = document.createElement('div');
+        row.className = 'filter-row';
+        row.innerHTML = `
+            <div class="filter-row-controls">
+                <select class="filter-select feature-field">
+                    <option value="" disabled selected>Choose feature</option>
+                    <option value="interior">Interior</option>
+                    <option value="exterior">Exterior</option>
+                    <option value="roof">Roof</option>
+                </select>
+                <select class="filter-select feature-condition">
+                    <option value="" disabled selected>Choose condition</option>
+                    <option value="included">Included</option>
+                    <option value="excluded">Excluded</option>
+                </select>
+            </div>
+            <button type="button" class="btn-inline-remove">Remove</button>
+        `;
+
+        row.querySelector('.btn-inline-remove').addEventListener('click', () => {
+            row.remove();
+            filterProjects();
+        });
+        row.querySelectorAll('select').forEach(select => {
+            select.addEventListener('change', filterProjects);
+        });
+
+        featureFilterRows.appendChild(row);
+        filterProjects();
+    }
+
+    function addNumericFilterRow() {
+        if (!numericFilterRows) return;
+
+        const row = document.createElement('div');
+        row.className = 'filter-row';
+        row.innerHTML = `
+            <div class="filter-row-controls">
+                <select class="filter-select numeric-field">
+                    <option value="" disabled selected>Choose field</option>
+                    <option value="sqft">Square Footage</option>
+                    <option value="levels">Levels</option>
+                    <option value="partition_density">Partition Density</option>
+                    <option value="site_condition">Site Condition</option>
+                    <option value="coverage">Coverage (%)</option>
+                    <option value="scan_count">Total Scans</option>
+                </select>
+                <select class="filter-select numeric-operator">
+                    <option value="" disabled selected>Choose operator</option>
+                    <option value="lt">&lt;</option>
+                    <option value="eq">=</option>
+                    <option value="gt">&gt;</option>
+                </select>
+                <input type="number" class="numeric-value" step="1" placeholder="Value">
+            </div>
+            <button type="button" class="btn-inline-remove">Remove</button>
+        `;
+
+        row.querySelector('.btn-inline-remove').addEventListener('click', () => {
+            row.remove();
+            filterProjects();
+        });
+        row.querySelectorAll('select').forEach(select => {
+            select.addEventListener('change', filterProjects);
+        });
+        row.querySelector('input').addEventListener('input', filterProjects);
+        row.querySelector('input').addEventListener('change', filterProjects);
+
+        numericFilterRows.appendChild(row);
+        filterProjects();
+    }
+
     function filterProjects() {
         const textFilter = searchInput ? searchInput.value.trim().toLowerCase() : '';
         const projectTypeFilter = projectTypeInput ? projectTypeInput.value.trim().toLowerCase() : '';
         const sectorFilter = sectorInput ? sectorInput.value.trim().toLowerCase() : '';
-        const hasActiveBooleanFilters = booleanFilters.some(({ id }) => {
-            const element = document.getElementById(id);
-            return element && element.value !== 'any';
-        });
-        const hasActiveNumericFilters = numericFilters.some(({ operatorId, valueId }) => {
-            const operatorElement = document.getElementById(operatorId);
-            const valueElement = document.getElementById(valueId);
-            return operatorElement && valueElement && operatorElement.value !== 'any' && valueElement.value !== '';
-        });
-        const hasActiveFilters = textFilter !== '' || projectTypeFilter !== '' || sectorFilter !== '' || hasActiveBooleanFilters || hasActiveNumericFilters;
+
+        const activeFeatureRows = featureFilterRows ? Array.from(featureFilterRows.querySelectorAll('.filter-row')).filter(row => {
+            const field = row.querySelector('.feature-field')?.value || '';
+            const condition = row.querySelector('.feature-condition')?.value || '';
+            return field && condition;
+        }) : [];
+
+        const activeNumericRows = numericFilterRows ? Array.from(numericFilterRows.querySelectorAll('.filter-row')).filter(row => {
+            const field = row.querySelector('.numeric-field')?.value || '';
+            const operator = row.querySelector('.numeric-operator')?.value || '';
+            const value = row.querySelector('.numeric-value')?.value || '';
+            return field && operator && value !== '';
+        }) : [];
+
+        const hasActiveFilters = textFilter !== '' || projectTypeFilter !== '' || sectorFilter !== '' || activeFeatureRows.length > 0 || activeNumericRows.length > 0;
 
         let visibleCount = 0;
 
@@ -298,18 +294,22 @@
             const matchesProjectType = projectTypeFilter === '' || projectType.indexOf(projectTypeFilter) > -1;
             const matchesSector = sectorFilter === '' || sector.indexOf(sectorFilter) > -1;
 
-            const matchesBoolean = booleanFilters.every(({ id, dataKey }) => {
-                const element = document.getElementById(id);
-                return !element || getBooleanMatch(card, dataKey, element.value);
+            const matchesFeatureFilters = activeFeatureRows.every(row => {
+                const field = row.querySelector('.feature-field').value;
+                const condition = row.querySelector('.feature-condition').value;
+                const dataKey = featureFieldMap[field];
+                return !dataKey || getBooleanMatch(card, dataKey, condition);
             });
 
-            const matchesNumeric = numericFilters.every(({ operatorId, valueId, dataKey, transform }) => {
-                const operatorElement = document.getElementById(operatorId);
-                const valueElement = document.getElementById(valueId);
-                return !operatorElement || !valueElement || getNumericMatch(card, dataKey, operatorElement.value, valueElement.value, transform);
+            const matchesNumericFilters = activeNumericRows.every(row => {
+                const field = row.querySelector('.numeric-field').value;
+                const operator = row.querySelector('.numeric-operator').value;
+                const value = row.querySelector('.numeric-value').value;
+                const config = numericFieldMap[field];
+                return !config || getNumericMatch(card, config.dataKey, operator, value, config.transform);
             });
 
-            if (matchesName && matchesProjectType && matchesSector && matchesBoolean && matchesNumeric) {
+            if (matchesName && matchesProjectType && matchesSector && matchesFeatureFilters && matchesNumericFilters) {
                 card.style.display = '';
                 visibleCount++;
             } else {
@@ -335,24 +335,13 @@
         sectorInput.addEventListener('input', filterProjects);
     }
 
-    booleanFilters.forEach(({ id }) => {
-        const element = document.getElementById(id);
-        if (element) {
-            element.addEventListener('change', filterProjects);
-        }
-    });
+    if (addFeatureButton) {
+        addFeatureButton.addEventListener('click', addFeatureFilterRow);
+    }
 
-    numericFilters.forEach(({ operatorId, valueId }) => {
-        const operatorElement = document.getElementById(operatorId);
-        const valueElement = document.getElementById(valueId);
-        if (operatorElement) {
-            operatorElement.addEventListener('change', filterProjects);
-        }
-        if (valueElement) {
-            valueElement.addEventListener('input', filterProjects);
-            valueElement.addEventListener('change', filterProjects);
-        }
-    });
+    if (addNumericButton) {
+        addNumericButton.addEventListener('click', addNumericFilterRow);
+    }
 
     if (clearFiltersButton) {
         clearFiltersButton.addEventListener('click', () => {
@@ -365,22 +354,12 @@
             if (sectorInput) {
                 sectorInput.value = '';
             }
-            booleanFilters.forEach(({ id }) => {
-                const element = document.getElementById(id);
-                if (element) {
-                    element.value = 'any';
-                }
-            });
-            numericFilters.forEach(({ operatorId, valueId }) => {
-                const operatorElement = document.getElementById(operatorId);
-                const valueElement = document.getElementById(valueId);
-                if (operatorElement) {
-                    operatorElement.value = 'any';
-                }
-                if (valueElement) {
-                    valueElement.value = '';
-                }
-            });
+            if (featureFilterRows) {
+                featureFilterRows.innerHTML = '';
+            }
+            if (numericFilterRows) {
+                numericFilterRows.innerHTML = '';
+            }
             filterProjects();
         });
     }

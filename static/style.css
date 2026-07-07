@@ -156,6 +156,14 @@ button:hover {
     margin-bottom: 8px;
 }
 
+.filter-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
 .filter-control {
     display: block;
     margin-bottom: 10px;
@@ -166,6 +174,53 @@ button:hover {
     font-size: 0.92rem;
     color: var(--color-text-secondary);
     margin-bottom: 5px;
+}
+
+.filter-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.filter-row-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    flex: 1;
+}
+
+.filter-select,
+.numeric-value {
+    width: 100%;
+    padding: 8px;
+    box-sizing: border-box;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    font-size: 0.95rem;
+}
+
+.filter-row .btn-inline-remove {
+    background-color: var(--color-danger);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 10px;
+    width: auto;
+    margin-top: 0;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.filter-row .btn-inline-remove:hover {
+    background-color: var(--color-danger-dark);
+}
+
+.btn-small {
+    padding: 6px 10px;
+    font-size: 0.9rem;
+    width: auto;
+    margin-top: 0;
 }
 
 .filter-operator-row {
