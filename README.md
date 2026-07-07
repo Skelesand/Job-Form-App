@@ -4,13 +4,13 @@
 
 
 Proof of concept goals:
-- Display each stored project and its features/information
-- Create filters for projects
-- Update existing projects
-- Add new projects
-- Delete projects
+- Display each stored project and its features/information ✅
+- Create filters for projects ✅
+- Update existing projects ✅
+- Add new projects ✅
+- Delete projects ✅
 - Perform basic calculations based on filtered projects
-- basic page navigation
+- basic page navigation ✅
 
 Overall goals:
 - Create a tool to efficiently document data on scan job. Should be able to be added to workflow with little additional work from scan tech.
@@ -21,7 +21,7 @@ Overall goals:
 
 Functionality Goals:
 
-- Update/modify pre-existing data in the table. (Implemented but needs bug fixing) ***
+- Update/modify pre-existing data in the table. ✅ (Implemented but needs bug fixing / polishing)
 
 - Anywhere that is using an "Other" category should be removed. Instead include a write-in option to create a new category and build the list of categories to choose from based on pre-existing "write-ins" in the DB.
  - E.g. A project in the data base has been labeled as "Building" so now "Building" is available in the drop down for any future project to choose. This should prevent inconsistencies in the dataset while still having the ability to write in new information if needed. User should prioritize finding a pre existing option before writing in their own.
@@ -30,15 +30,15 @@ Functionality Goals:
  - E.G. Avg # scans for Industrial Buildings over 1000sqft
  - Ideally done by toggling what filters to various features and then performing some calculation like finding the mean # of scans based on those filters.
 
-- Create a display page to view each logged projects information.
- - Display each projects title and include a dropdown menu to display the feature information about that project, pulled from the DB/excel sheet.
- - Include edit and delete buttons to each project dropdown
+- Create a display page to view each logged projects information. ✅
+ - Display each projects title and include a dropdown menu to display the feature information about that project, pulled from the DB/excel sheet. ✅
+ - Include edit and delete buttons to each project dropdown ✅
 
 - Each different Project type should collect its own set of features. This is beacause estimating the total # of scans required to complete a building will require different information than estimating the total # of scans
     for a piece of machinery.
 
-- Create nav bar on the side to switch between different pages
- - create a template page to apply to each html page to keep consistent navigation
+- Create nav bar on the side to switch between different pages ✅
+ - create a template page to apply to each html page to keep consistent navigation ✅
 
 
 
