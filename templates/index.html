@@ -13,179 +13,203 @@
                 <a href="/form" class="btn">+ Add / Update Project</a>
             </div>
 
-            {% if jobs %}
-                <div id="projects_list">
-                    {% for job in jobs %}
-                        <details class="project-card"
-                                 data-project-name="{{ job.project_name|default('')|string }}"
-                                 data-project-type="{{ job.project_type|default('')|string }}"
-                                 data-sector="{{ job.sector|default('')|string }}"
-                                 data-sqft="{{ job.sqft|default('')|string }}"
-                                 data-levels="{{ job.levels|default('')|string }}"
-                                 data-partition-density="{{ job.partition_density|default('')|string }}"
-                                 data-site-condition="{{ job.site_condition|default('')|string }}"
-                                 data-interior="{{ job.interior|default('')|string|lower }}"
-                                 data-exterior="{{ job.exterior|default('')|string|lower }}"
-                                 data-roof="{{ job.roof|default('')|string|lower }}"
-                                 data-coverage="{{ job.coverage|default('')|string }}"
-                                 data-scan-count="{{ job.scan_count|default('')|string }}">
-                            <summary>
-                                <span>{{ job.project_name }}</span>
-                                <span class="timestamp-badge">Updated: {{ job.timestamp }}</span>
-                            </summary>
-                            <div class="project-details">
-                                <div class="grid">
-                                    <div class="grid-item"><strong>Project Type:</strong> {{ job.project_type }}</div>
-                                    <div class="grid-item"><strong>Sector:</strong> {{ job.sector }}</div>
-                                    <div class="grid-item"><strong>Square Footage:</strong> {{ job.sqft }} sqft</div>
-                                    <div class="grid-item"><strong>Levels:</strong> {{ job.levels }}</div>
-                                    <div class="grid-item"><strong>Partition Density:</strong> {{ job.partition_density }}</div>
-                                    <div class="grid-item"><strong>Site Condition:</strong>
-                                        {% if job.site_condition|string == "1" %}Empty/Near Empty
-                                        {% elif job.site_condition|string == "2" %}Light Clutter
-                                        {% elif job.site_condition|string == "3" %}Heavy Clutter
-                                        {% else %}{{ job.site_condition }}{% endif %}
+            <div class="dashboard-scroll-area">
+                {% if jobs %}
+                    <div id="projects_list">
+                        {% for job in jobs %}
+                            <details class="project-card"
+                                     data-project-name="{{ job.project_name|default('')|string }}"
+                                     data-project-type="{{ job.project_type|default('')|string }}"
+                                     data-sector="{{ job.sector|default('')|string }}"
+                                     data-sqft="{{ job.sqft|default('')|string }}"
+                                     data-levels="{{ job.levels|default('')|string }}"
+                                     data-partition-density="{{ job.partition_density|default('')|string }}"
+                                     data-site-condition="{{ job.site_condition|default('')|string }}"
+                                     data-interior="{{ job.interior|default('')|string|lower }}"
+                                     data-exterior="{{ job.exterior|default('')|string|lower }}"
+                                     data-roof="{{ job.roof|default('')|string|lower }}"
+                                     data-coverage="{{ job.coverage|default('')|string }}"
+                                     data-scan-count="{{ job.scan_count|default('')|string }}">
+                                <summary>
+                                    <span>{{ job.project_name }}</span>
+                                    <span class="timestamp-badge">Updated: {{ job.timestamp }}</span>
+                                </summary>
+                                <div class="project-details">
+                                    <div class="grid">
+                                        <div class="grid-item"><strong>Project Type:</strong> {{ job.project_type }}</div>
+                                        <div class="grid-item"><strong>Sector:</strong> {{ job.sector }}</div>
+                                        <div class="grid-item"><strong>Square Footage:</strong> {{ job.sqft }} sqft</div>
+                                        <div class="grid-item"><strong>Levels:</strong> {{ job.levels }}</div>
+                                        <div class="grid-item"><strong>Partition Density:</strong> {{ job.partition_density }}</div>
+                                        <div class="grid-item"><strong>Site Condition:</strong>
+                                            {% if job.site_condition|string == "1" %}Empty/Near Empty
+                                            {% elif job.site_condition|string == "2" %}Light Clutter
+                                            {% elif job.site_condition|string == "3" %}Heavy Clutter
+                                            {% else %}{{ job.site_condition }}{% endif %}
+                                        </div>
+                                        <div class="grid-item"><strong>Interior Scanned:</strong> {{ 'Yes' if job.interior == 'y' else 'No' if job.interior == 'n' else job.interior }}</div>
+                                        <div class="grid-item"><strong>Exterior Scanned:</strong> {{ 'Yes' if job.exterior == 'y' else 'No' if job.exterior == 'n' else job.exterior }}</div>
+                                        <div class="grid-item"><strong>Roof Scanned:</strong> {{ 'Yes' if job.roof == 'y' else 'No' if job.roof == 'n' else job.roof }}</div>
+                                        <div class="grid-item"><strong>Coverage:</strong> {{ "%.0f"|format(job.coverage|float * 100) }}%</div>
+                                        <div class="grid-item"><strong>Total Scans:</strong> {{ job.scan_count }}</div>
                                     </div>
-                                    <div class="grid-item"><strong>Interior Scanned:</strong> {{ 'Yes' if job.interior == 'y' else 'No' if job.interior == 'n' else job.interior }}</div>
-                                    <div class="grid-item"><strong>Exterior Scanned:</strong> {{ 'Yes' if job.exterior == 'y' else 'No' if job.exterior == 'n' else job.exterior }}</div>
-                                    <div class="grid-item"><strong>Roof Scanned:</strong> {{ 'Yes' if job.roof == 'y' else 'No' if job.roof == 'n' else job.roof }}</div>
-                                    <div class="grid-item"><strong>Coverage:</strong> {{ "%.0f"|format(job.coverage|float * 100) }}%</div>
-                                    <div class="grid-item"><strong>Total Scans:</strong> {{ job.scan_count }}</div>
+                                    <div class="card-actions">
+                                        <button class="btn-delete" onclick="deleteJob('{{ job.project_name }}', this)">Delete Project</button>
+                                        <button class="btn-edit" onclick="editJob('{{ job.project_name }}')">Edit Project</button>
+                                    </div>
                                 </div>
-                                <div class="card-actions">
-                                    <button class="btn-delete" onclick="deleteJob('{{ job.project_name }}', this)">Delete Project</button>
-                                    <button class="btn-edit" onclick="editJob('{{ job.project_name }}')">Edit Project</button>
-                                </div>
-                            </div>
-                        </details>
-                    {% endfor %}
-                </div>
-                <div id="no_match_message" class="no-data" style="display: none;">No matching projects found.</div>
-            {% else %}
-                <div class="no-data">No logged project entries found in the spreadsheet data pool.</div>
-            {% endif %}
+                            </details>
+                        {% endfor %}
+                    </div>
+                    <div id="no_match_message" class="no-data" style="display: none;">No matching projects found.</div>
+                {% else %}
+                    <div class="no-data">No logged project entries found in the spreadsheet data pool.</div>
+                {% endif %}
+            </div>
         </div>
     </div>
 
-    <aside class="filter-panel">
-        <div class="filter-panel-header">
-            <h3>Filter Projects</h3>
-            <button type="button" id="clear_filters" class="btn-secondary">Clear</button>
-        </div>
+    <div class="dashboard-side-panels">
+        <aside class="side-panel">
+            <div class="filter-panel-header">
+                <h3>Filter Projects</h3>
+                <button type="button" id="clear_filters" class="btn-secondary">Clear</button>
+            </div>
 
-        <div class="filter-group">
-            <label class="filter-group-title" for="dashboard_search">Project Name</label>
-            <input type="text" id="dashboard_search" placeholder="Search by name..." autocomplete="off">
-        </div>
+            <div class="filter-group">
+                <label class="filter-group-title" for="dashboard_search">Project Name</label>
+                <input type="text" id="dashboard_search" placeholder="Search by name..." autocomplete="off">
+            </div>
 
-        <div class="filter-group">
-            <div class="filter-group-title">Feature Filters</div>
-            <label class="filter-control">
-                <span>Interior Scanned</span>
-                <select id="filter_interior">
-                    <option value="any">Any</option>
-                    <option value="included">Included</option>
-                    <option value="excluded">Excluded</option>
-                </select>
-            </label>
-            <label class="filter-control">
-                <span>Exterior Scanned</span>
-                <select id="filter_exterior">
-                    <option value="any">Any</option>
-                    <option value="included">Included</option>
-                    <option value="excluded">Excluded</option>
-                </select>
-            </label>
-            <label class="filter-control">
-                <span>Roof Scanned</span>
-                <select id="filter_roof">
-                    <option value="any">Any</option>
-                    <option value="included">Included</option>
-                    <option value="excluded">Excluded</option>
-                </select>
-            </label>
-        </div>
+            <div class="filter-group">
+                <label class="filter-control">
+                    <span>Project Type</span>
+                    <input type="text" id="filter_project_type" placeholder="Search by type..." autocomplete="off">
+                </label>
+                <label class="filter-control">
+                    <span>Sector</span>
+                    <input type="text" id="filter_sector" placeholder="Search by sector..." autocomplete="off">
+                </label>
+            </div>
 
-        <div class="filter-group">
-            <div class="filter-group-title">Numeric Filters</div>
-            <label class="filter-control">
-                <span>Square Footage</span>
-                <div class="filter-operator-row">
-                    <select id="filter_sqft_operator">
+            <div class="filter-group">
+                <div class="filter-group-title">Feature Filters</div>
+                <label class="filter-control">
+                    <span>Interior Scanned</span>
+                    <select id="filter_interior">
                         <option value="any">Any</option>
-                        <option value="lt">&lt;</option>
-                        <option value="eq">=</option>
-                        <option value="gt">&gt;</option>
+                        <option value="included">Included</option>
+                        <option value="excluded">Excluded</option>
                     </select>
-                    <input type="number" id="filter_sqft_value" step="1" placeholder="Value">
-                </div>
-            </label>
-            <label class="filter-control">
-                <span>Levels</span>
-                <div class="filter-operator-row">
-                    <select id="filter_levels_operator">
+                </label>
+                <label class="filter-control">
+                    <span>Exterior Scanned</span>
+                    <select id="filter_exterior">
                         <option value="any">Any</option>
-                        <option value="lt">&lt;</option>
-                        <option value="eq">=</option>
-                        <option value="gt">&gt;</option>
+                        <option value="included">Included</option>
+                        <option value="excluded">Excluded</option>
                     </select>
-                    <input type="number" id="filter_levels_value" step="1" placeholder="Value">
-                </div>
-            </label>
-            <label class="filter-control">
-                <span>Partition Density</span>
-                <div class="filter-operator-row">
-                    <select id="filter_partition_density_operator">
+                </label>
+                <label class="filter-control">
+                    <span>Roof Scanned</span>
+                    <select id="filter_roof">
                         <option value="any">Any</option>
-                        <option value="lt">&lt;</option>
-                        <option value="eq">=</option>
-                        <option value="gt">&gt;</option>
+                        <option value="included">Included</option>
+                        <option value="excluded">Excluded</option>
                     </select>
-                    <input type="number" id="filter_partition_density_value" step="1" placeholder="Value">
-                </div>
-            </label>
-            <label class="filter-control">
-                <span>Site Condition</span>
-                <div class="filter-operator-row">
-                    <select id="filter_site_condition_operator">
-                        <option value="any">Any</option>
-                        <option value="lt">&lt;</option>
-                        <option value="eq">=</option>
-                        <option value="gt">&gt;</option>
-                    </select>
-                    <input type="number" id="filter_site_condition_value" step="1" placeholder="Value">
-                </div>
-            </label>
-            <label class="filter-control">
-                <span>Coverage (%)</span>
-                <div class="filter-operator-row">
-                    <select id="filter_coverage_operator">
-                        <option value="any">Any</option>
-                        <option value="lt">&lt;</option>
-                        <option value="eq">=</option>
-                        <option value="gt">&gt;</option>
-                    </select>
-                    <input type="number" id="filter_coverage_value" step="1" placeholder="Value">
-                </div>
-            </label>
-            <label class="filter-control">
-                <span>Total Scans</span>
-                <div class="filter-operator-row">
-                    <select id="filter_scan_count_operator">
-                        <option value="any">Any</option>
-                        <option value="lt">&lt;</option>
-                        <option value="eq">=</option>
-                        <option value="gt">&gt;</option>
-                    </select>
-                    <input type="number" id="filter_scan_count_value" step="1" placeholder="Value">
-                </div>
-            </label>
-        </div>
-    </aside>
+                </label>
+            </div>
+
+            <div class="filter-group">
+                <div class="filter-group-title">Numeric Filters</div>
+                <label class="filter-control">
+                    <span>Square Footage</span>
+                    <div class="filter-operator-row">
+                        <select id="filter_sqft_operator">
+                            <option value="any">Any</option>
+                            <option value="lt">&lt;</option>
+                            <option value="eq">=</option>
+                            <option value="gt">&gt;</option>
+                        </select>
+                        <input type="number" id="filter_sqft_value" step="1" placeholder="Value">
+                    </div>
+                </label>
+                <label class="filter-control">
+                    <span>Levels</span>
+                    <div class="filter-operator-row">
+                        <select id="filter_levels_operator">
+                            <option value="any">Any</option>
+                            <option value="lt">&lt;</option>
+                            <option value="eq">=</option>
+                            <option value="gt">&gt;</option>
+                        </select>
+                        <input type="number" id="filter_levels_value" step="1" placeholder="Value">
+                    </div>
+                </label>
+                <label class="filter-control">
+                    <span>Partition Density</span>
+                    <div class="filter-operator-row">
+                        <select id="filter_partition_density_operator">
+                            <option value="any">Any</option>
+                            <option value="lt">&lt;</option>
+                            <option value="eq">=</option>
+                            <option value="gt">&gt;</option>
+                        </select>
+                        <input type="number" id="filter_partition_density_value" step="1" placeholder="Value">
+                    </div>
+                </label>
+                <label class="filter-control">
+                    <span>Site Condition</span>
+                    <div class="filter-operator-row">
+                        <select id="filter_site_condition_operator">
+                            <option value="any">Any</option>
+                            <option value="lt">&lt;</option>
+                            <option value="eq">=</option>
+                            <option value="gt">&gt;</option>
+                        </select>
+                        <input type="number" id="filter_site_condition_value" step="1" placeholder="Value">
+                    </div>
+                </label>
+                <label class="filter-control">
+                    <span>Coverage (%)</span>
+                    <div class="filter-operator-row">
+                        <select id="filter_coverage_operator">
+                            <option value="any">Any</option>
+                            <option value="lt">&lt;</option>
+                            <option value="eq">=</option>
+                            <option value="gt">&gt;</option>
+                        </select>
+                        <input type="number" id="filter_coverage_value" step="1" placeholder="Value">
+                    </div>
+                </label>
+                <label class="filter-control">
+                    <span>Total Scans</span>
+                    <div class="filter-operator-row">
+                        <select id="filter_scan_count_operator">
+                            <option value="any">Any</option>
+                            <option value="lt">&lt;</option>
+                            <option value="eq">=</option>
+                            <option value="gt">&gt;</option>
+                        </select>
+                        <input type="number" id="filter_scan_count_value" step="1" placeholder="Value">
+                    </div>
+                </label>
+            </div>
+        </aside>
+
+        <aside class="side-panel metrics-panel">
+            <div class="filter-panel-header">
+                <h3>Metrics</h3>
+            </div>
+            <div class="metrics-placeholder">Filtered metrics will appear here.</div>
+        </aside>
+    </div>
 </div>
 
 <script>
     const searchInput = document.getElementById('dashboard_search');
+    const projectTypeInput = document.getElementById('filter_project_type');
+    const sectorInput = document.getElementById('filter_sector');
     const clearFiltersButton = document.getElementById('clear_filters');
     const projectCards = Array.from(document.querySelectorAll('.project-card'));
     const noMatchMessage = document.getElementById('no_match_message');
@@ -250,6 +274,8 @@
 
     function filterProjects() {
         const textFilter = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        const projectTypeFilter = projectTypeInput ? projectTypeInput.value.trim().toLowerCase() : '';
+        const sectorFilter = sectorInput ? sectorInput.value.trim().toLowerCase() : '';
         const hasActiveBooleanFilters = booleanFilters.some(({ id }) => {
             const element = document.getElementById(id);
             return element && element.value !== 'any';
@@ -259,17 +285,18 @@
             const valueElement = document.getElementById(valueId);
             return operatorElement && valueElement && operatorElement.value !== 'any' && valueElement.value !== '';
         });
-        const hasActiveFilters = textFilter !== '' || hasActiveBooleanFilters || hasActiveNumericFilters;
+        const hasActiveFilters = textFilter !== '' || projectTypeFilter !== '' || sectorFilter !== '' || hasActiveBooleanFilters || hasActiveNumericFilters;
 
         let visibleCount = 0;
 
         projectCards.forEach(card => {
-            const projectSummary = [
-                card.getAttribute('data-project-name') || '',
-                card.getAttribute('data-project-type') || '',
-                card.getAttribute('data-sector') || ''
-            ].join(' ').toLowerCase();
-            const matchesText = projectSummary.indexOf(textFilter) > -1;
+            const projectName = (card.getAttribute('data-project-name') || '').toLowerCase();
+            const projectType = (card.getAttribute('data-project-type') || '').toLowerCase();
+            const sector = (card.getAttribute('data-sector') || '').toLowerCase();
+
+            const matchesName = projectName.indexOf(textFilter) > -1;
+            const matchesProjectType = projectTypeFilter === '' || projectType.indexOf(projectTypeFilter) > -1;
+            const matchesSector = sectorFilter === '' || sector.indexOf(sectorFilter) > -1;
 
             const matchesBoolean = booleanFilters.every(({ id, dataKey }) => {
                 const element = document.getElementById(id);
@@ -282,7 +309,7 @@
                 return !operatorElement || !valueElement || getNumericMatch(card, dataKey, operatorElement.value, valueElement.value, transform);
             });
 
-            if (matchesText && matchesBoolean && matchesNumeric) {
+            if (matchesName && matchesProjectType && matchesSector && matchesBoolean && matchesNumeric) {
                 card.style.display = '';
                 visibleCount++;
             } else {
@@ -298,6 +325,14 @@
 
     if (searchInput) {
         searchInput.addEventListener('input', filterProjects);
+    }
+
+    if (projectTypeInput) {
+        projectTypeInput.addEventListener('input', filterProjects);
+    }
+
+    if (sectorInput) {
+        sectorInput.addEventListener('input', filterProjects);
     }
 
     booleanFilters.forEach(({ id }) => {
@@ -323,6 +358,12 @@
         clearFiltersButton.addEventListener('click', () => {
             if (searchInput) {
                 searchInput.value = '';
+            }
+            if (projectTypeInput) {
+                projectTypeInput.value = '';
+            }
+            if (sectorInput) {
+                sectorInput.value = '';
             }
             booleanFilters.forEach(({ id }) => {
                 const element = document.getElementById(id);

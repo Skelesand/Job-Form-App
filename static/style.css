@@ -75,7 +75,7 @@ button:hover {
 /* Dashboard Container Specifics */
 .dashboard-shell {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, auto);
     gap: 24px;
     align-items: start;
 }
@@ -101,7 +101,20 @@ button:hover {
     margin-bottom: 20px;
 }
 
-.filter-panel {
+.dashboard-scroll-area {
+    max-height: calc(100vh - 210px);
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.dashboard-side-panels {
+    display: grid;
+    grid-template-columns: 320px 300px;
+    gap: 16px;
+    align-items: start;
+}
+
+.side-panel {
     background: rgba(255, 255, 255, 0.96);
     border: 1px solid var(--color-border-light);
     border-radius: 8px;
@@ -118,7 +131,7 @@ button:hover {
     margin-bottom: 14px;
 }
 
-.filter-panel h3 {
+.side-panel h3 {
     margin: 0;
     font-size: 1rem;
     color: var(--color-text-primary);
@@ -159,6 +172,12 @@ button:hover {
     display: grid;
     grid-template-columns: 78px 1fr;
     gap: 8px;
+}
+
+.metrics-placeholder {
+    color: var(--color-text-light);
+    font-size: 0.95rem;
+    padding: 6px 0 4px;
 }
 
 .btn-secondary {
