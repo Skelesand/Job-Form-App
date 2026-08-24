@@ -11,6 +11,18 @@
 
             <div class="dashboard-toolbar">
                 <a href="/form" class="btn">+ Add / Update Project</a>
+                <div class="sort-controls">
+                    <label for="sort_by" class="sort-label">Sort by</label>
+                    <select id="sort_by" class="sort-select">
+                        <option value="default">Default</option>
+                        <option value="updated_desc">Updated ↓</option>
+                        <option value="updated_asc">Updated ↑</option>
+                        <option value="name_asc">Project name (A–Z)</option>
+                        <option value="name_desc">Project name (Z–A)</option>
+                        <option value="scans_desc">Total scans ↓</option>
+                        <option value="scans_asc">Total scans ↑</option>
+                    </select>
+                </div>
             </div>
 
             <div class="dashboard-scroll-area">
@@ -29,7 +41,8 @@
                                      data-exterior="{{ job.exterior|default('')|string|lower }}"
                                      data-roof="{{ job.roof|default('')|string|lower }}"
                                      data-coverage="{{ job.coverage|default('')|string }}"
-                                     data-scan-count="{{ job.scan_count|default('')|string }}">
+                                     data-scan-count="{{ job.scan_count|default('')|string }}"
+                                     data-timestamp="{{ job.timestamp|default('')|string }}">
                                 <summary>
                                     <span>{{ job.project_name }}</span>
                                     <span class="timestamp-badge">Updated: {{ job.timestamp }}</span>
@@ -113,7 +126,24 @@
             <div class="filter-panel-header">
                 <h3>Metrics</h3>
             </div>
-            <div class="metrics-placeholder">Filtered metrics will appear here.</div>
+            <div class="metrics-placeholder">
+                <div class="metric-row">
+                    <div class="filter-group-title">Project Count</div>
+                    <div id="metrics_count" class="metric-value">—</div>
+                </div>
+                <div class="metric-row">
+                    <div class="filter-group-title">Average Scans per Job</div>
+                    <div id="metrics_avg" class="metric-value">—</div>
+                </div>
+                <div class="metric-row">
+                    <div class="filter-group-title">Average sqft per Scan</div>
+                    <div id="metrics_sqft_per_scan" class="metric-value">—</div>
+                </div>
+                <div class="metric-row">
+                    <div class="filter-group-title">Median Scans per Job</div>
+                    <div id="metrics_median" class="metric-value">—</div>
+                </div>
+            </div>
         </aside>
     </div>
 </div>
@@ -125,9 +155,11 @@
     const clearFiltersButton = document.getElementById('clear_filters');
     const addFeatureButton = document.getElementById('add_feature_filter');
     const addNumericButton = document.getElementById('add_numeric_filter');
+    const sortSelect = document.getElementById('sort_by');
     const featureFilterRows = document.getElementById('feature_filter_rows');
     const numericFilterRows = document.getElementById('numeric_filter_rows');
     const projectCards = Array.from(document.querySelectorAll('.project-card'));
+    const projectsContainer = document.getElementById('projects_list');
     const noMatchMessage = document.getElementById('no_match_message');
 
     const featureFieldMap = {
@@ -263,6 +295,58 @@
         filterProjects();
     }
 
+    function compareStrings(a, b) {
+        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+    }
+
+    function compareTimestamp(a, b) {
+        const valueA = a.getAttribute('data-timestamp') || '';
+        const valueB = b.getAttribute('data-timestamp') || '';
+        if (!valueA && !valueB) return 0;
+        if (!valueA) return 1;
+        if (!valueB) return -1;
+        return valueA.localeCompare(valueB);
+    }
+
+    function compareScanCount(a, b) {
+        const valueA = Number(a.getAttribute('data-scan-count'));
+        const valueB = Number(b.getAttribute('data-scan-count'));
+        if (Number.isNaN(valueA) && Number.isNaN(valueB)) return 0;
+        if (Number.isNaN(valueA)) return 1;
+        if (Number.isNaN(valueB)) return -1;
+        return valueA - valueB;
+    }
+
+    function sortProjects() {
+        if (!projectsContainer) return;
+
+        const sortValue = sortSelect ? sortSelect.value : 'default';
+        const sortedCards = [...projectCards].sort((cardA, cardB) => {
+            const nameA = (cardA.getAttribute('data-project-name') || '').toLowerCase();
+            const nameB = (cardB.getAttribute('data-project-name') || '').toLowerCase();
+            const nameCompare = compareStrings(nameA, nameB);
+
+            switch (sortValue) {
+                case 'updated_desc':
+                    return compareTimestamp(cardB, cardA) || nameCompare;
+                case 'updated_asc':
+                    return compareTimestamp(cardA, cardB) || nameCompare;
+                case 'name_asc':
+                    return nameCompare || compareTimestamp(cardA, cardB);
+                case 'name_desc':
+                    return -nameCompare || compareTimestamp(cardA, cardB);
+                case 'scans_desc':
+                    return -compareScanCount(cardA, cardB) || nameCompare;
+                case 'scans_asc':
+                    return compareScanCount(cardA, cardB) || nameCompare;
+                default:
+                    return 0;
+            }
+        });
+
+        sortedCards.forEach(card => projectsContainer.appendChild(card));
+    }
+
     function filterProjects() {
         const textFilter = searchInput ? searchInput.value.trim().toLowerCase() : '';
         const projectTypeFilter = projectTypeInput ? projectTypeInput.value.trim().toLowerCase() : '';
@@ -321,6 +405,10 @@
         if (noMatchMessage) {
             noMatchMessage.style.display = visibleCount === 0 && hasActiveFilters ? 'block' : 'none';
         }
+
+        sortProjects();
+        // Update metrics for currently visible (filtered) projects
+        updateMetrics();
     }
 
     if (searchInput) {
@@ -341,6 +429,10 @@
 
     if (addNumericButton) {
         addNumericButton.addEventListener('click', addNumericFilterRow);
+    }
+
+    if (sortSelect) {
+        sortSelect.addEventListener('change', filterProjects);
     }
 
     if (clearFiltersButton) {
@@ -365,6 +457,55 @@
     }
 
     filterProjects();
+
+    // Metrics calculation helpers
+    function computeAverage(values) {
+        if (!values.length) return null;
+        const sum = values.reduce((a, b) => a + b, 0);
+        return sum / values.length;
+    }
+
+    function computeMedian(values) {
+        if (!values.length) return null;
+        const sorted = values.slice().sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        if (sorted.length % 2 === 0) {
+            return (sorted[mid - 1] + sorted[mid]) / 2;
+        }
+        return sorted[mid];
+    }
+
+    function updateMetrics() {
+        const visibleCards = projectCards.filter(card => card.style.display !== 'none');
+        const count = visibleCards.length;
+        const scanValues = visibleCards.map(card => {
+            const v = Number(card.getAttribute('data-scan-count'));
+            return Number.isFinite(v) ? v : null;
+        }).filter(v => v !== null);
+
+        const avg = computeAverage(scanValues);
+        const med = computeMedian(scanValues);
+
+        // Compute sqft per scan for each visible project that has valid sqft > 0 and scans > 0
+        const sqftPerScanValues = visibleCards.map(card => {
+            const scans = Number(card.getAttribute('data-scan-count'));
+            const sqft = Number(card.getAttribute('data-sqft'));
+            if (!Number.isFinite(scans) || !Number.isFinite(sqft) || sqft <= 0 || scans <= 0) return null;
+            return sqft / scans;
+        }).filter(v => v !== null);
+
+        const avgSqftPerScan = computeAverage(sqftPerScanValues);
+
+        const countEl = document.getElementById('metrics_count');
+        const avgEl = document.getElementById('metrics_avg');
+        const medEl = document.getElementById('metrics_median');
+        const spSqftEl = document.getElementById('metrics_sqft_per_scan');
+
+        countEl.textContent = count.toString();
+        avgEl.textContent = avg === null ? '—' : (Math.round(avg * 10) / 10).toString();
+        medEl.textContent = med === null ? '—' : (Math.round(med * 10) / 10).toString();
+        spSqftEl.textContent = avgSqftPerScan === null ? '—' : (Math.round(avgSqftPerScan * 1000) / 1000).toString();
+    }
 
     function deleteJob(projectName, buttonElement) {
         const confirmed = confirm(`Are you sure you want to delete "${projectName}"? This action cannot be undone.`);

@@ -97,8 +97,28 @@ button:hover {
 
 .dashboard-toolbar {
     display: flex;
-    justify-content: flex-start;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
     margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.sort-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sort-label {
+    font-size: 0.95rem;
+    color: var(--color-text-secondary);
+    font-weight: bold;
+}
+
+.sort-select {
+    min-width: 210px;
+    margin-top: 0;
 }
 
 .dashboard-scroll-area {
@@ -115,7 +135,7 @@ button:hover {
 }
 
 .side-panel {
-    background: rgba(255, 255, 255, 0.96);
+    background: var(--color-bg-card);
     border: 1px solid var(--color-border-light);
     border-radius: 8px;
     padding: 18px;
@@ -233,6 +253,31 @@ button:hover {
     color: var(--color-text-light);
     font-size: 0.95rem;
     padding: 6px 0 4px;
+}
+
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-border-lighter);
+}
+
+.metric-row:last-child { border-bottom: none; }
+
+.metric-value {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: var(--color-text-primary);
+}
+
+/* Ensure metrics panel remains locked at the top of the page like the filter panel */
+.metrics-panel {
+    /* Keep metrics panel in normal document flow so it does NOT stay visible while scrolling */
+    position: static;
+    align-self: start;
+    width: auto;
+    height: auto;
 }
 
 .btn-secondary {
