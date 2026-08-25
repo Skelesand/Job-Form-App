@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block title %}Estimate Scan Count{% endblock %}
+
+{% block content %}
+<div class="form-container prediction-page">
+    <h2>Estimate Scan Count</h2>
+    <div class="subtitle">Enter the planned job details to compare it with similar projects.</div>
+
+    <form id="prediction_form">
+        <label for="project_type">Project Type</label>
+        <select id="project_type" name="project_type" required>
+            <option value="" disabled selected>Select a project type...</option>
+            <option value="Area">Area</option>
+            <option value="Building">Building</option>
+            <option value="Feature">Feature</option>
+            <option value="Other">Other</option>
+        </select>
+
+        <label for="sector">Sector</label>
+        <select id="sector" name="sector" required>
+            <option value="" disabled selected>Select a sector...</option>
+            <option value="Commercial">Commercial</option>
+            <option value="Industrial">Industrial</option>
+            <option value="Medical">Medical</option>
+            <option value="Office">Office</option>
+            <option value="Residential">Residential</option>
+            <option value="Other">Other</option>
+        </select>
+
+        <label for="sqft">Square footage:</label>
+        <input type="number" id="sqft" name="sqft" required min="1">
+
+        <label for="levels">Levels:</label>
+        <input type="number" id="levels" name="levels" required min="1">
+
+        <label for="partition_density">Partition Density:</label>
+        <input type="number" id="partition_density" name="partition_density" required min="0">
+
+        <label for="site_condition">Site Condition</label>
+        <select id="site_condition" name="site_condition" required>
+            <option value="" disabled selected>Select a site condition...</option>
+            <option value="1">Empty/Near Empty</option>
+            <option value="2">Light Clutter</option>
+            <option value="3">Heavy Clutter</option>
+        </select>
+
+        <label for="interior">Interior Scanned?</label>
+        <select id="interior" name="interior" required>
+            <option value="" disabled selected>Yes or No</option>
+            <option value="y">Yes</option>
+            <option value="n">No</option>
+        </select>
+
+        <label for="exterior">Exterior Scanned?</label>
+        <select id="exterior" name="exterior" required>
+            <option value="" disabled selected>Yes or No</option>
+            <option value="y">Yes</option>
+            <option value="n">No</option>
+        </select>
+
+        <label for="roof">Roof Scanned?</label>
+        <select id="roof" name="roof" required>
+            <option value="" disabled selected>Yes or No</option>
+            <option value="y">Yes</option>
+            <option value="n">No</option>
+        </select>
+
+        <label for="coverage">Coverage</label>
+        <input type="number" step=".01" id="coverage" name="coverage" required min="0" max="1">
+
+        <button type="submit">Estimate Scans</button>
+    </form>
+
+    <section id="prediction_panel" class="prediction-panel" aria-live="polite">
+        <div id="prediction_status" class="prediction-status">Complete the form to request an estimate.</div>
+        <div id="prediction_result" class="prediction-result" hidden>
+            <div class="prediction-number"><span id="prediction_value">-</span><small>estimated scans</small></div>
+            <div class="prediction-range"><strong>Planning range:</strong> <span id="range_value">-</span> scans <small>(estimate and closest match)</small></div>
+            <div class="prediction-confidence"><strong id="confidence_value">-</strong> confidence</div>
+            <div class="matches-heading">Closest historical matches</div>
+            <ul id="matches_list"></ul>
+        </div>
+    </section>
+</div>
+
+<script>
+    const predictionForm = document.getElementById('prediction_form');
+    const predictionButton = predictionForm.querySelector('button[type="submit"]');
+    const predictionStatus = document.getElementById('prediction_status');
+    const predictionResult = document.getElementById('prediction_result');
+    const predictionValue = document.getElementById('prediction_value');
+    const rangeValue = document.getElementById('range_value');
+    const confidenceValue = document.getElementById('confidence_value');
+    const matchesList = document.getElementById('matches_list');
+
+    predictionForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        const formData = new FormData(predictionForm);
+        const formValues = Object.fromEntries(formData.entries());
+        predictionButton.disabled = true;
+        predictionResult.hidden = true;
+        predictionStatus.textContent = 'Generating estimate...';
+
+        try {
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formValues)
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'The estimate could not be generated.');
+            }
+
+            predictionValue.textContent = result.prediction;
+            rangeValue.textContent = `${result.range[0]}-${result.range[1]}`;
+            confidenceValue.textContent = `${result.confidence}%`;
+            matchesList.replaceChildren();
+            result.matches.forEach(match => {
+                const item = document.createElement('li');
+                item.textContent = `${match.project_name}: ${match.scan_count} scans (${match.influence}% influence)`;
+                matchesList.appendChild(item);
+            });
+            predictionStatus.textContent = 'Estimate based on the current form values.';
+            predictionResult.hidden = false;
+        } catch (error) {
+            predictionStatus.textContent = error.message;
+        } finally {
+            predictionButton.disabled = false;
+        }
+    });
+</script>
+{% endblock %}

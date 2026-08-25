@@ -315,6 +315,62 @@ button:hover {
     margin-bottom: 20px;
 }
 
+.prediction-panel {
+    background: #fff;
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-primary-orange);
+    border-radius: 4px;
+    padding: 15px;
+    margin-top: 20px;
+}
+
+.prediction-status {
+    color: var(--color-text-light);
+    font-size: 14px;
+}
+
+.prediction-result {
+    border-top: 1px solid var(--color-border-light);
+    margin-top: 14px;
+    padding-top: 14px;
+}
+
+.prediction-number {
+    color: var(--color-primary-orange-dark);
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.prediction-number small {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    font-weight: normal;
+    margin-left: 6px;
+}
+
+.prediction-confidence {
+    color: var(--color-text-secondary);
+    margin: 4px 0 14px;
+}
+
+.prediction-range {
+    color: var(--color-text-secondary);
+    margin: 4px 0;
+}
+
+.matches-heading {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.prediction-result ul {
+    color: var(--color-text-light);
+    font-size: 14px;
+    margin: 6px 0 0;
+    padding-left: 20px;
+}
+
 label { 
     font-weight: bold; 
     display: block; 

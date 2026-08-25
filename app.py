@@ -3,6 +3,7 @@ import os
 import time
 from flask import Flask, jsonify, render_template, request, redirect, url_for
 import openpyxl
+import model
 
 app = Flask(__name__)
 
@@ -10,6 +11,27 @@ EXCEL_PATH = os.getenv(
     "EXCEL_PATH",
     r"data\Scan_Log_Dataset.xlsx"
 )
+
+_prediction_cache = {
+    "modified_time": None,
+    "historical_df": None,
+    "engine": None,
+}
+
+
+def get_prediction_engine():
+    """Load and cache the prediction engine until the workbook changes."""
+    modified_time = os.path.getmtime(EXCEL_PATH)
+    if _prediction_cache["modified_time"] != modified_time:
+        model.file_path = EXCEL_PATH
+        historical_df = model.load_and_prepare_data()
+        engine = model.build_similarity_engine(historical_df)
+        _prediction_cache.update({
+            "modified_time": modified_time,
+            "historical_df": historical_df,
+            "engine": engine,
+        })
+    return _prediction_cache["historical_df"], _prediction_cache["engine"]
 
 
 def get_existing_projects(filepath):
@@ -153,6 +175,80 @@ def get_project_data():
     return jsonify({"success": False, "error": "Project not found"})
 
 
+@app.route("/predict", methods=["GET", "POST"])
+def predict():
+    """Estimate scans for the current form values without saving the job."""
+    if request.method == "GET":
+        return render_template("predict.html")
+
+    try:
+        data = request.get_json(silent=True) or {}
+        required_fields = [
+            "project_type", "sector", "sqft", "levels",
+            "partition_density", "site_condition", "interior",
+            "exterior", "roof", "coverage"
+        ]
+        missing_fields = [field for field in required_fields if data.get(field) in (None, "")]
+        if missing_fields:
+            return jsonify({
+                "success": False,
+                "error": "Complete all project details before requesting an estimate."
+            }), 400
+
+        try:
+            input_data = {
+                "Project Type": data["project_type"],
+                "Sector": data["sector"],
+                "Sqft": float(data["sqft"]),
+                "Levels": float(data["levels"]),
+                "Partition Density": float(data["partition_density"]),
+                "Site Condition": float(data["site_condition"]),
+                "Interior": data["interior"],
+                "Exterior": data["exterior"],
+                "Roof": data["roof"],
+                "Coverage": float(data["coverage"]),
+            }
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "error": "Numeric fields must contain valid numbers."}), 400
+
+        if input_data["Sqft"] <= 0 or input_data["Levels"] <= 0 or input_data["Coverage"] < 0 or input_data["Coverage"] > 1:
+            return jsonify({"success": False, "error": "Square footage and levels must be positive, and coverage must be between 0 and 1."}), 400
+
+        historical_df, engine = get_prediction_engine()
+        if len(historical_df) < 4:
+            return jsonify({"success": False, "error": "At least four records are needed before estimates can be generated."}), 400
+
+        input_df = model.pd.DataFrame([input_data])
+        matches, prediction, confidence = model.find_lookalike_jobs(
+            input_df,
+            historical_df,
+            *engine,
+        )
+        closest_match_scan_count = float(matches.iloc[0]["Total Scans"])
+        observed_range = [
+            int(round(min(prediction, closest_match_scan_count))),
+            int(round(max(prediction, closest_match_scan_count)))
+        ]
+        match_data = []
+        for _, match in matches.iterrows():
+            match_data.append({
+                "project_name": str(match.get("Project Name", "Historical project")),
+                "scan_count": int(round(float(match["Total Scans"]))),
+                "influence": round(float(match["Influence_Weight"]) * 100, 1),
+            })
+
+        return jsonify({
+            "success": True,
+            "prediction": round(prediction),
+            "range": observed_range,
+            "confidence": round(confidence, 1),
+            "matches": match_data,
+        })
+    except Exception as exc:
+        print(f"[Error] Prediction failed: {exc}")
+        return jsonify({"success": False, "error": "The estimate could not be generated from the current data."}), 500
+
+
 def remove_project_from_excel(filepath, project_name):
     """Remove a project row from Excel by project name."""
     max_retries = 3
@@ -256,7 +352,7 @@ def submit():
         success = update_or_append_to_excel(EXCEL_PATH, new_row)
 
         if success:
-            return "<h3>Job logged/updated successfully! Box will sync the file shortly.</h3><a href='/'>Go to Home Dashboard</a>"
+            return "<h3>Job logged/updated successfully!</h3><a href='/'>Go to Home Dashboard</a>"
         else:
             return "<h3>Error: The Excel file is currently open/locked. Please try submitting again.</h3><a href='/form'>Go Back</a>"
     except Exception as e:
