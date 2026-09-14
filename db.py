@@ -2,8 +2,9 @@ import datetime as dt
 import os
 from pathlib import Path
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, Integer, String, create_engine, select
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, Integer, String, create_engine, event, func, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+import validation
 
 
 DEFAULT_DATABASE_URL = "sqlite:///data/scan_jobs.db"
@@ -54,7 +55,15 @@ def get_engine(database_url=None):
             database_path = Path(url.removeprefix("sqlite:///"))
             if not database_path.is_absolute():
                 database_path.parent.mkdir(parents=True, exist_ok=True)
-        _engine = create_engine(url, future=True)
+        connect_args = {"timeout": 10} if url.startswith("sqlite") else {}
+        _engine = create_engine(url, future=True, connect_args=connect_args)
+        if url.startswith("sqlite"):
+            @event.listens_for(_engine, "connect")
+            def configure_sqlite(dbapi_connection, connection_record):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.execute("PRAGMA busy_timeout=10000")
+                cursor.close()
     return _engine
 
 
@@ -126,8 +135,17 @@ def project_names(database_url=None):
 def get_project(project_name, database_url=None):
     init_db(database_url)
     with get_session_factory(database_url)() as session:
-        project = session.scalar(select(Project).where(Project.project_name == project_name.strip()))
+        identity = validation.project_identity(project_name)
+        project = session.scalar(select(Project).where(func.lower(Project.project_name) == identity))
         return project_to_dict(project) if project else None
+
+
+def get_projects_by_ids(project_ids, database_url=None):
+    init_db(database_url)
+    with get_session_factory(database_url)() as session:
+        projects = session.scalars(select(Project).where(Project.id.in_(project_ids))).all()
+        projects_by_id = {project.id: project for project in projects}
+        return [project_to_dict(projects_by_id[project_id]) for project_id in project_ids if project_id in projects_by_id]
 
 
 def get_training_rows(project_type=None, database_url=None):
@@ -143,9 +161,11 @@ def get_training_rows(project_type=None, database_url=None):
 
 
 def upsert_project(values, database_url=None):
+    values = validation.validate_project(values)
     init_db(database_url)
     with get_session_factory(database_url)() as session:
-        project = session.scalar(select(Project).where(Project.project_name == values["project_name"]))
+        identity = validation.project_identity(values["project_name"])
+        project = session.scalar(select(Project).where(func.lower(Project.project_name) == identity))
         if project is None:
             project = Project(project_name=values["project_name"])
             session.add(project)
@@ -163,6 +183,17 @@ def delete_project(project_name, database_url=None):
     init_db(database_url)
     with get_session_factory(database_url)() as session:
         project = session.scalar(select(Project).where(Project.project_name == project_name.strip()))
+        if project is None:
+            return False
+        session.delete(project)
+        session.commit()
+        return True
+
+
+def delete_project_by_id(project_id, database_url=None):
+    init_db(database_url)
+    with get_session_factory(database_url)() as session:
+        project = session.get(Project, project_id)
         if project is None:
             return False
         session.delete(project)

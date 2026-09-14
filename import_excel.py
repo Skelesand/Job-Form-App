@@ -6,6 +6,7 @@ import pandas as pd
 from sqlalchemy import select
 
 import db
+import validation
 
 
 REQUIRED_COLUMNS = [
@@ -16,16 +17,12 @@ REQUIRED_COLUMNS = [
 
 
 def normalize_name(value):
-    return str(value).strip().casefold()
+    return validation.project_identity(value)
 
 
 def parse_row(row, row_number):
-    project_name = str(row["Project Name"]).strip()
-    if not project_name or project_name.lower() == "nan":
-        raise ValueError(f"row {row_number}: Project Name is required")
-
     values = {
-        "project_name": project_name,
+        "project_name": row["Project Name"],
         "project_type": str(row["Project Type"]).strip(),
         "sector": str(row["Sector"]).strip(),
         "sqft": int(float(row["Sqft"])),
@@ -38,17 +35,10 @@ def parse_row(row, row_number):
         "coverage": float(row["Coverage"]),
         "scan_count": int(float(row["Total Scans"])),
     }
-    if values["sqft"] <= 0 or values["levels"] <= 0:
-        raise ValueError(f"row {row_number}: square footage and levels must be positive")
-    if values["partition_density"] < 0:
-        raise ValueError(f"row {row_number}: partition density cannot be negative")
-    if values["site_condition"] not in {1, 2, 3}:
-        raise ValueError(f"row {row_number}: site condition must be 1, 2, or 3")
-    if not 0 <= values["coverage"] <= 1:
-        raise ValueError(f"row {row_number}: coverage must be between 0 and 1")
-    if values["scan_count"] <= 0:
-        raise ValueError(f"row {row_number}: total scans must be positive")
-    return values
+    try:
+        return validation.validate_project(values)
+    except validation.ValidationError as exc:
+        raise ValueError(f"row {row_number}: {exc}") from exc
 
 
 def inspect_workbook(excel_path):
@@ -77,6 +67,10 @@ def import_workbook(excel_path, database_url=None, dry_run=False):
         "errors": errors,
         "duplicates": duplicate_names,
         "imported": 0,
+        "added": 0,
+        "updated": 0,
+        "skipped": 0,
+        "rejected": len(errors),
     }
     if errors or duplicate_names or dry_run:
         return report
@@ -91,6 +85,7 @@ def import_workbook(excel_path, database_url=None, dry_run=False):
         collisions = sorted(existing_names.intersection(normalize_name(row["project_name"]) for row in rows))
         if collisions:
             report["duplicates"] = collisions
+            report["skipped"] = len(collisions)
             return report
 
         for values in rows:
@@ -106,6 +101,7 @@ def import_workbook(excel_path, database_url=None, dry_run=False):
             session.add(project)
         session.commit()
         report["imported"] = len(rows)
+        report["added"] = len(rows)
     return report
 
 

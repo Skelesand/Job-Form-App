@@ -40,6 +40,7 @@
                     <div id="projects_list">
                         {% for job in jobs %}
                             <details class="project-card"
+                                     data-project-id="{{ job.id }}"
                                      data-project-name="{{ job.project_name|default('')|string }}"
                                      data-project-type="{{ job.project_type|default('')|string }}"
                                      data-sector="{{ job.sector|default('')|string }}"
@@ -77,8 +78,8 @@
                                         <div class="grid-item"><strong>Total Scans:</strong> {{ job.scan_count }}</div>
                                     </div>
                                     <div class="card-actions">
-                                        <button class="btn-delete" onclick="deleteJob('{{ job.project_name }}', this)">Delete Project</button>
-                                        <button class="btn-edit" onclick="editJob('{{ job.project_name }}')">Edit Project</button>
+                                        <button class="btn-delete" type="button">Delete Project</button>
+                                        <button class="btn-edit" type="button">Edit Project</button>
                                     </div>
                                 </div>
                             </details>
@@ -173,6 +174,14 @@
     const projectCards = Array.from(document.querySelectorAll('.project-card'));
     const projectsContainer = document.getElementById('projects_list');
     const noMatchMessage = document.getElementById('no_match_message');
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+    function jsonHeaders() {
+        return {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken,
+        };
+    }
 
     const featureFieldMap = {
         interior: 'interior',
@@ -521,26 +530,14 @@
 
     function getVisibleProjects() {
         return projectCards.filter(card => card.style.display !== 'none').map(card => ({
-            project_name: card.getAttribute('data-project-name') || '',
-            project_type: card.getAttribute('data-project-type') || '',
-            sector: card.getAttribute('data-sector') || '',
-            sqft: card.getAttribute('data-sqft') || '',
-            levels: card.getAttribute('data-levels') || '',
-            partition_density: card.getAttribute('data-partition-density') || '',
-            site_condition: card.getAttribute('data-site-condition') || '',
-            interior: card.getAttribute('data-interior') || '',
-            exterior: card.getAttribute('data-exterior') || '',
-            roof: card.getAttribute('data-roof') || '',
-            coverage: card.getAttribute('data-coverage') || '',
-            scan_count: card.getAttribute('data-scan-count') || '',
-            timestamp: card.getAttribute('data-timestamp') || ''
+            id: card.getAttribute('data-project-id') || ''
         }));
     }
 
     if (exportButton) {
         exportButton.addEventListener('click', async () => {
-            const projects = getVisibleProjects();
-            if (!projects.length) {
+            const projectIds = getVisibleProjects().map(project => project.id);
+            if (!projectIds.length) {
                 alert('There are no visible projects to export.');
                 return;
             }
@@ -550,10 +547,10 @@
             try {
                 const response = await fetch('/export', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: jsonHeaders(),
                     body: JSON.stringify({
                         format: exportFormat ? exportFormat.value : 'xlsx',
-                        projects
+                        project_ids: projectIds
                     })
                 });
                 if (!response.ok) {
@@ -577,22 +574,24 @@
         });
     }
 
-    function deleteJob(projectName, buttonElement) {
+    function deleteJob(projectId, projectName, buttonElement) {
         const confirmed = confirm(`Are you sure you want to delete "${projectName}"? This action cannot be undone.`);
         if (!confirmed) return;
 
         fetch('/delete', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ project_name: projectName })
+            headers: jsonHeaders(),
+            body: JSON.stringify({ id: projectId })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 alert('Job deleted successfully!');
                 const card = buttonElement.closest('.project-card');
+                const cardIndex = projectCards.indexOf(card);
+                if (cardIndex !== -1) {
+                    projectCards.splice(cardIndex, 1);
+                }
                 card.remove();
                 filterProjects();
             } else {
@@ -608,5 +607,16 @@
     function editJob(projectName) {
         window.location.href = `/form?project=${encodeURIComponent(projectName)}`;
     }
+
+    projectCards.forEach(card => {
+        const projectId = card.getAttribute('data-project-id') || '';
+        const projectName = card.getAttribute('data-project-name') || '';
+        card.querySelector('.btn-delete')?.addEventListener('click', event => {
+            deleteJob(projectId, projectName, event.currentTarget);
+        });
+        card.querySelector('.btn-edit')?.addEventListener('click', () => {
+            editJob(projectName);
+        });
+    });
 </script>
 {% endblock %}

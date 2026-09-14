@@ -93,6 +93,7 @@
     const rangeValue = document.getElementById('range_value');
     const confidenceValue = document.getElementById('confidence_value');
     const matchesList = document.getElementById('matches_list');
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
     predictionForm.addEventListener('submit', async event => {
         event.preventDefault();
@@ -105,7 +106,10 @@
         try {
             const response = await fetch('/predict', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                },
                 body: JSON.stringify(formValues)
             });
             const result = await response.json();

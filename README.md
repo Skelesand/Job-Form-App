@@ -4,22 +4,43 @@
 
 ## Database setup
 
-The app now stores projects in SQLite at `data/scan_jobs.db` by default. The original
-Excel workbook is retained as a backup and is only used by the one-time importer.
+## Running locally
 
-Install dependencies and initialize the database:
+Use the project virtual environment and set a development secret before starting Flask:
 
 ```powershell
-pip install -r requirements.txt
-python import_excel.py --excel data/Scan_Log_Dataset.xlsx --dry-run
-python import_excel.py --excel data/Scan_Log_Dataset.xlsx
-python app.py
+$env:APP_ENV = "development"
+$env:SECRET_KEY = "local-development-secret"
+.\.venv\Scripts\python.exe app.py
 ```
 
-Set `DATABASE_URL` to use another database supported by SQLAlchemy, such as a
-PostgreSQL connection string. The importer validates required fields and reports
-duplicate project names before writing. Do not remove the original workbook until
-the imported row count and values have been verified.
+The app uses SQLite at `data/scan_jobs.db` by default. SQLite is the source of truth; Excel is used only for explicit imports and exports.
+
+## Internal deployment
+
+This app is designed for trusted company-network or VPN access. Do not expose it directly to the public internet. In production, set a strong random `SECRET_KEY`, set `APP_ENV=production`, keep `FLASK_DEBUG=0`, and run behind a production WSGI server. The default bind address is `127.0.0.1`; change `APP_HOST` only when the host firewall and network boundary are configured.
+
+Important environment variables:
+
+- `APP_ENV`: `development`, `test`, or `production`
+- `SECRET_KEY`: required outside development
+- `DATABASE_URL`: defaults to `sqlite:///data/scan_jobs.db`
+- `APP_HOST` and `APP_PORT`: local server binding
+- `LOG_LEVEL`: defaults to `INFO`
+
+## Backups
+
+Create a consistent SQLite backup while the app is running:
+
+```powershell
+\.venv\Scripts\python.exe -c "import backup; backup.create_timestamped_backup('sqlite:///data/scan_jobs.db', 'data/backups')"
+```
+
+Keep backups outside the application source folder when possible, apply a retention policy, and periodically restore one to a separate database to verify it is usable. The restore helper is available through `backup.restore_database`.
+
+## Excel imports
+
+Use `import_excel.py` for explicit imports. Run with `--dry-run` first; invalid rows and case-insensitive duplicate project names prevent a commit. A successful import is transactional.
 
 
 Proof of concept goals:
@@ -28,22 +49,27 @@ Proof of concept goals:
 - Update existing projects ✅
 - Add new projects ✅
 - Delete projects ✅
-- Perform basic calculations based on filtered projects
+- Perform basic calculations based on filtered projects ✅
 - basic page navigation ✅
 
 Overall goals:
 - Create a tool to efficiently document data on scan job. Should be able to be added to workflow with little additional work from scan tech.
 
-- Avoid any areas of human error.
- - e.g. avoid using measurement tool to guesstimate the square footage of an area
+- Avoid introducing human error.
 
 
 Functionality Goals:
+
+- establish a proper database ✅
 
 - Update/modify pre-existing data in the table. ✅ (Implemented but needs bug fixing / polishing)
 
 - Anywhere that is using an "Other" category should be removed. Instead include a write-in option to create a new category and build the list of categories to choose from based on pre-existing "write-ins" in the DB.
  - E.g. A project in the data base has been labeled as "Building" so now "Building" is available in the drop down for any future project to choose. This should prevent inconsistencies in the dataset while still having the ability to write in new information if needed. User should prioritize finding a pre existing option before writing in their own.
+
+- Possibly alternative to the Other category replacement: Include a tag system to add custom tags to any project. 
+ - For example every windmill blade scan can have the #windmill_blade tag. 
+ - This could allow for quick filtering and metrics on very specific types of projects
 
 - Perform basic analysis based on certain categories / filters
  - E.G. Avg # scans for Industrial Buildings over 1000sqft

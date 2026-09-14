@@ -1,19 +1,26 @@
-import datetime
 import csv
 import io
+import logging
 import os
-import time
-from flask import Flask, jsonify, render_template, request, redirect, send_file, url_for
+from flask import Flask, jsonify, redirect, render_template, request, send_file, url_for
+from flask_wtf.csrf import CSRFProtect
 import openpyxl
 import model
 import db
+import validation
 
 app = Flask(__name__)
-
-EXCEL_PATH = os.getenv(
-    "EXCEL_PATH",
-    r"data\Scan_Log_Dataset.xlsx"
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me")
+if APP_ENV not in {"development", "test"} and SECRET_KEY == "dev-only-change-me":
+    raise RuntimeError("SECRET_KEY must be configured outside development.")
+app.config.update(
+    SECRET_KEY=SECRET_KEY,
+    WTF_CSRF_TIME_LIMIT=None,
 )
+csrf = CSRFProtect(app)
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
+logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL", db.DEFAULT_DATABASE_URL)
 db.init_db(DATABASE_URL)
@@ -22,6 +29,43 @@ _prediction_cache = {
     "database_url": None,
     "engines": {},
 }
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    return response
+
+
+@app.errorhandler(400)
+def handle_bad_request(error):
+    if request.is_json:
+        return jsonify({"success": False, "error": "The request could not be processed."}), 400
+    return render_template("error.html", status_code=400, message="The request could not be processed."), 400
+
+
+@app.errorhandler(404)
+def handle_not_found(error):
+    if request.is_json:
+        return jsonify({"success": False, "error": "The requested resource was not found."}), 404
+    return render_template("error.html", status_code=404, message="The requested page was not found."), 404
+
+
+@app.errorhandler(500)
+def handle_server_error(error):
+    logger.exception("Unhandled application error")
+    if request.is_json:
+        return jsonify({"success": False, "error": "An unexpected server error occurred."}), 500
+    return render_template("error.html", status_code=500, message="An unexpected server error occurred."), 500
+
+
+def spreadsheet_safe(value):
+    """Prevent exported text from being interpreted as a spreadsheet formula."""
+    if isinstance(value, str) and value.startswith(("=", "+", "-", "@")):
+        return "'" + value
+    return value
 
 
 def get_prediction_engine(project_type):
@@ -42,121 +86,6 @@ def get_prediction_engine(project_type):
         _prediction_cache["engines"][normalized_type] = (historical_df, engine)
 
     return _prediction_cache["engines"][normalized_type]
-
-
-def get_existing_projects(filepath):
-    """Reads the Excel sheet and returns a unique list of project names from Column A."""
-    projects = []
-    try:
-        if os.path.exists(filepath):
-            wb = openpyxl.load_workbook(filepath, data_only=True)
-            sheet = wb.active
-            for row in sheet.iter_rows(min_row=2, max_col=1):
-                if row[0].value:
-                    val = str(row[0].value).strip()
-                    if val and val not in projects:
-                        projects.append(val)
-            wb.close()
-    except Exception as e:
-        print(f"[Warning] Could not read project list: {e}")
-    return sorted(projects)
-
-
-def get_all_projects(filepath):
-    """Reads the entire Excel sheet and returns a list of dictionaries for all logged jobs."""
-    projects = []
-    try:
-        if os.path.exists(filepath):
-            wb = openpyxl.load_workbook(filepath, data_only=True)
-            sheet = wb.active
-            for row in sheet.iter_rows(min_row=2):
-                if row[0].value:
-                    projects.append({
-                        "project_name": str(row[0].value).strip(),
-                        "project_type": row[1].value if len(row) > 1 and row[1].value else "",
-                        "sector": row[2].value if len(row) > 2 and row[2].value else "",
-                        "sqft": row[3].value if len(row) > 3 and row[3].value else "",
-                        "levels": row[4].value if len(row) > 4 and row[4].value else "",
-                        "partition_density": row[5].value if len(row) > 5 and row[5].value else "",
-                        "site_condition": row[6].value if len(row) > 6 and row[6].value else "",
-                        "interior": row[7].value if len(row) > 7 and row[7].value else "",
-                        "exterior": row[8].value if len(row) > 8 and row[8].value else "",
-                        "roof": row[9].value if len(row) > 9 and row[9].value else "",
-                        "coverage": row[10].value if len(row) > 10 and row[10].value else "",
-                        "scan_count": row[11].value if len(row) > 11 and row[11].value else "",
-                        "timestamp": row[12].value if len(row) > 12 and row[12].value else ""
-                    })
-            wb.close()
-    except Exception as e:
-        print(f"[Error] Could not read all projects: {e}")
-    return projects
-
-
-def get_project_details(filepath, project_name):
-    """Searches for a project by name and returns its row values as a dictionary."""
-    try:
-        if os.path.exists(filepath):
-            wb = openpyxl.load_workbook(filepath, data_only=True)
-            sheet = wb.active
-
-            for row in sheet.iter_rows(min_row=2):
-                if row[0].value and str(row[0].value).strip() == project_name.strip():
-                    data = {
-                        "project_type": row[1].value if row[1].value else "",
-                        "sector": row[2].value if row[2].value else "",
-                        "sqft": row[3].value if row[3].value else "",
-                        "levels": row[4].value if row[4].value else "",
-                        "partition_density": row[5].value if row[5].value else "",
-                        "site_condition": row[6].value if row[6].value else "",
-                        "interior": row[7].value if row[7].value else "",
-                        "exterior": row[8].value if row[8].value else "",
-                        "roof": row[9].value if row[9].value else "",
-                        "coverage": row[10].value if row[10].value else "",
-                        "scan_count": row[11].value if row[11].value else "",
-                    }
-                    wb.close()
-                    return data
-            wb.close()
-    except Exception as e:
-        print(f"[Error] Failed to fetch project details: {e}")
-    return None
-
-
-def update_or_append_to_excel(filepath, data_row):
-    max_retries = 3
-    retry_delay = 2
-
-    for attempt in range(max_retries):
-        try:
-            wb = openpyxl.load_workbook(filepath)
-            sheet = wb.active
-
-            project_name = data_row[0]
-            row_updated = False
-
-            for row in sheet.iter_rows(min_row=1, max_col=1):
-                if row[0].value == project_name:
-                    current_row_idx = row[0].row
-                    for col_idx, value in enumerate(data_row, start=1):
-                        sheet.cell(row=current_row_idx, column=col_idx, value=value)
-                    row_updated = True
-                    print(f"[Info] Updated existing row for project: {project_name}")
-                    break
-
-            if not row_updated:
-                sheet.append(data_row)
-                print(f"[Info] Appended new row for project: {project_name}")
-
-            wb.save(filepath)
-            wb.close()
-            return True
-
-        except PermissionError:
-            print(f"[Warning] File locked. Retrying in {retry_delay} seconds... (Attempt {attempt + 1}/{max_retries})")
-            time.sleep(retry_delay)
-
-    print("[Error] Could not write to Excel. File locked.")
-    return False
 
 
 @app.route("/")
@@ -187,22 +116,29 @@ def get_project_data():
 
 @app.route("/export", methods=["POST"])
 def export_projects():
-    """Create a CSV or Excel download from the dashboard's visible projects."""
+    """Create a CSV or Excel download from authoritative database records."""
     data = request.get_json(silent=True) or {}
-    projects = data.get("projects")
+    project_ids = data.get("project_ids")
     export_format = data.get("format", "xlsx").lower()
 
-    if not isinstance(projects, list):
+    if not isinstance(project_ids, list) or not project_ids:
         return jsonify({"success": False, "error": "No projects were provided for export."}), 400
     if export_format not in {"csv", "xlsx"}:
         return jsonify({"success": False, "error": "Unsupported export format."}), 400
+
+    try:
+        project_ids = [int(project_id) for project_id in project_ids]
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "Project identifiers must be numeric."}), 400
+
+    projects = db.get_projects_by_ids(project_ids, DATABASE_URL)
 
     columns = [
         "Project Name", "Project Type", "Sector", "Square Footage", "Levels",
         "Partition Density", "Site Condition", "Interior Scanned", "Exterior Scanned",
         "Roof Scanned", "Coverage", "Total Scans", "Updated",
     ]
-    rows = [[project.get(key, "") for key in [
+    rows = [[spreadsheet_safe(project.get(key, "")) for key in [
         "project_name", "project_type", "sector", "sqft", "levels",
         "partition_density", "site_condition", "interior", "exterior",
         "roof", "coverage", "scan_count", "timestamp",
@@ -247,36 +183,22 @@ def predict():
 
     try:
         data = request.get_json(silent=True) or {}
-        required_fields = [
-            "project_type", "sector", "sqft", "levels",
-            "partition_density", "site_condition", "interior",
-            "exterior", "roof", "coverage"
-        ]
-        missing_fields = [field for field in required_fields if data.get(field) in (None, "")]
-        if missing_fields:
-            return jsonify({
-                "success": False,
-                "error": "Complete all project details before requesting an estimate."
-            }), 400
-
         try:
+            normalized = validation.validate_prediction(data)
             input_data = {
-                "Project Type": data["project_type"],
-                "Sector": data["sector"],
-                "Sqft": float(data["sqft"]),
-                "Levels": float(data["levels"]),
-                "Partition Density": float(data["partition_density"]),
-                "Site Condition": float(data["site_condition"]),
-                "Interior": data["interior"],
-                "Exterior": data["exterior"],
-                "Roof": data["roof"],
-                "Coverage": float(data["coverage"]),
+                "Project Type": normalized["project_type"],
+                "Sector": normalized["sector"],
+                "Sqft": normalized["sqft"],
+                "Levels": normalized["levels"],
+                "Partition Density": normalized["partition_density"],
+                "Site Condition": normalized["site_condition"],
+                "Interior": normalized["interior"],
+                "Exterior": normalized["exterior"],
+                "Roof": normalized["roof"],
+                "Coverage": normalized["coverage"],
             }
-        except (TypeError, ValueError):
-            return jsonify({"success": False, "error": "Numeric fields must contain valid numbers."}), 400
-
-        if input_data["Sqft"] <= 0 or input_data["Levels"] <= 0 or input_data["Coverage"] < 0 or input_data["Coverage"] > 1:
-            return jsonify({"success": False, "error": "Square footage and levels must be positive, and coverage must be between 0 and 1."}), 400
+        except validation.ValidationError:
+            return jsonify({"success": False, "error": "Complete the fields with valid values before requesting an estimate."}), 400
 
         historical_df, engine = get_prediction_engine(input_data["Project Type"])
         if engine is None:
@@ -324,117 +246,48 @@ def predict():
             "matches": match_data,
         })
     except Exception as exc:
-        print(f"[Error] Prediction failed: {exc}")
+        logger.exception("Prediction failed")
         return jsonify({"success": False, "error": "The estimate could not be generated from the current data."}), 500
-
-
-def remove_project_from_excel(filepath, project_name):
-    """Remove a project row from Excel by project name."""
-    max_retries = 3
-    retry_delay = 2
-
-    for attempt in range(max_retries):
-        try:
-            wb = openpyxl.load_workbook(filepath)
-            sheet = wb.active
-            
-            # Find and delete the row with matching project name
-            for row in sheet.iter_rows(min_row=2):
-                if row[0].value and str(row[0].value).strip() == project_name.strip():
-                    sheet.delete_rows(row[0].row)
-                    wb.save(filepath)
-                    wb.close()
-                    print(f"[Info] Deleted row for project: {project_name}")
-                    return True
-            
-            wb.close()
-            # If we get here, project wasn't found
-            return False
-
-        except PermissionError:
-            print(f"[Warning] File locked. Retrying in {retry_delay} seconds... (Attempt {attempt + 1}/{max_retries})")
-            time.sleep(retry_delay)
-    
-    print("[Error] Could not write to Excel. File locked.")
-    return False
 
 
 @app.route("/delete", methods=["POST"])
 def delete_project():
     try:
-        data = request.get_json()
-        project_name = data.get("project_name")
+        data = request.get_json(silent=True) or {}
+        project_id = int(data.get("id"))
         
-        if not project_name:
-            return jsonify({"success": False, "error": "No project name provided"})
+        if project_id <= 0:
+            raise ValueError
         
-        # Remove the project from Excel
-        success = db.delete_project(project_name, DATABASE_URL)
+        success = db.delete_project_by_id(project_id, DATABASE_URL)
         
         if success:
+            _prediction_cache["engines"] = {}
             return jsonify({"success": True, "message": "Project deleted successfully"})
-        else:
-            return jsonify({"success": False, "error": "Failed to delete project"})
-    except Exception as e:
-        print(f"[Error] Error deleting project: {e}")
-        return jsonify({"success": False, "error": str(e)})
+        return jsonify({"success": False, "error": "Project not found."}), 404
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "A valid project identifier is required."}), 400
+    except Exception as exc:
+        logger.exception("Error deleting project")
+        return jsonify({"success": False, "error": "The project could not be deleted."}), 500
 
 
 @app.route("/submit", methods=["POST"])
 def submit():
     try:
-        project_name = request.form.get("project_name")
-        project_type = request.form.get("project_type")
-        sector = request.form.get("sector")
-        sqft = request.form.get("sqft")
-        levels = request.form.get("levels")
-        partition_density = request.form.get("partition_density")
-        site_condition = request.form.get("site_condition")
-        interior = request.form.get("interior")
-        exterior = request.form.get("exterior")
-        roof = request.form.get("roof")
-        coverage = request.form.get("coverage")
-        scan_count = request.form.get("scan_count")
-        # Validate required fields
-        if not project_name or not project_name.strip():
-            return "<h3>Error: Project name is required.</h3><a href='/form'>Go Back</a>"
-
-        # Validate and convert numeric fields with error handling
-        try:
-            sqft = int(sqft)
-            levels = int(levels)
-            partition_density = int(partition_density)
-            site_condition = int(site_condition)
-            coverage = float(coverage)
-            scan_count = int(scan_count)
-        except (ValueError, TypeError) as e:
-            return f"<h3>Error: Invalid numeric input. {str(e)}</h3><a href='/form'>Go Back</a>"
-
-        if sqft <= 0 or levels <= 0 or partition_density < 0 or site_condition not in {1, 2, 3}:
-            return "<h3>Error: Numeric values are outside the allowed ranges.</h3><a href='/form'>Go Back</a>"
-        if coverage < 0 or coverage > 1 or scan_count <= 0:
-            return "<h3>Error: Coverage must be between 0 and 1 and scans must be positive.</h3><a href='/form'>Go Back</a>"
-
-        db.upsert_project({
-            "project_name": project_name.strip(),
-            "project_type": project_type.strip(),
-            "sector": sector.strip(),
-            "sqft": sqft,
-            "levels": levels,
-            "partition_density": partition_density,
-            "site_condition": site_condition,
-            "interior": interior,
-            "exterior": exterior,
-            "roof": roof,
-            "coverage": coverage,
-            "scan_count": scan_count,
-        }, DATABASE_URL)
+        values = validation.validate_project(request.form.to_dict())
+        db.upsert_project(values, DATABASE_URL)
         _prediction_cache["engines"] = {}
-        return "<h3>Job logged/updated successfully!</h3><a href='/'>Go to Home Dashboard</a>"
-    except Exception as e:
-        print(f"[Error] Unexpected error in /submit: {e}")
-        return f"<h3>Error: An unexpected error occurred. Please try again.</h3><a href='/form'>Go Back</a>"
+        return redirect(url_for("home"))
+    except validation.ValidationError as exc:
+        return render_template("form.html", projects=db.project_names(DATABASE_URL), errors=exc.errors), 400
+    except Exception as exc:
+        logger.exception("Unexpected error in /submit")
+        return render_template("error.html", status_code=500, message="The job could not be saved."), 500
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    host = os.getenv("APP_HOST", "127.0.0.1")
+    port = int(os.getenv("APP_PORT", "5000"))
+    debug = os.getenv("FLASK_DEBUG", "0").strip().lower() in {"1", "true", "yes"}
+    app.run(host=host, port=port, debug=debug)

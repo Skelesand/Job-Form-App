@@ -6,7 +6,18 @@
 <div class="form-container">
     <h2>Scan Job Log</h2>
     <div class="subtitle">Search/select an existing project to overwrite it, or type a new one to create it.</div>
+    {% if errors %}
+        <div class="form-errors" role="alert">
+            <strong>Please correct the following:</strong>
+            <ul>
+                {% for field, message in errors.items() %}
+                    <li>{{ field|replace('_', ' ')|title }}: {{ message }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
     <form action="/submit" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         
         <label for="project_name">Project Name / ID:</label>
         <div class="autocomplete-container">

@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ status_code }} - Scan App{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <h2>{{ status_code }}</h2>
+    <p>{{ message }}</p>
+    <a class="btn" href="{{ url_for('home') }}">Return to dashboard</a>
+</div>
+{% endblock %}
