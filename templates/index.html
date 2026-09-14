@@ -11,7 +11,16 @@
 
             <div class="dashboard-toolbar">
                 <a href="/form" class="btn">+ Add / Update Project</a>
-                <div class="sort-controls">
+                <div class="dashboard-toolbar-actions">
+                    <div class="export-controls">
+                        <label for="export_format" class="sort-label">Export filtered</label>
+                        <select id="export_format" class="sort-select">
+                            <option value="xlsx">Excel (.xlsx)</option>
+                            <option value="csv">CSV (.csv)</option>
+                        </select>
+                        <button type="button" id="export_projects" class="btn-secondary">Download</button>
+                    </div>
+                    <div class="sort-controls">
                     <label for="sort_by" class="sort-label">Sort by</label>
                     <select id="sort_by" class="sort-select">
                         <option value="default">Default</option>
@@ -22,6 +31,7 @@
                         <option value="scans_desc">Total scans ↓</option>
                         <option value="scans_asc">Total scans ↑</option>
                     </select>
+                    </div>
                 </div>
             </div>
 
@@ -156,6 +166,8 @@
     const addFeatureButton = document.getElementById('add_feature_filter');
     const addNumericButton = document.getElementById('add_numeric_filter');
     const sortSelect = document.getElementById('sort_by');
+    const exportFormat = document.getElementById('export_format');
+    const exportButton = document.getElementById('export_projects');
     const featureFilterRows = document.getElementById('feature_filter_rows');
     const numericFilterRows = document.getElementById('numeric_filter_rows');
     const projectCards = Array.from(document.querySelectorAll('.project-card'));
@@ -505,6 +517,64 @@
         avgEl.textContent = avg === null ? '—' : (Math.round(avg * 10) / 10).toString();
         medEl.textContent = med === null ? '—' : (Math.round(med * 10) / 10).toString();
         spSqftEl.textContent = avgSqftPerScan === null ? '—' : (Math.round(avgSqftPerScan * 1000) / 1000).toString();
+    }
+
+    function getVisibleProjects() {
+        return projectCards.filter(card => card.style.display !== 'none').map(card => ({
+            project_name: card.getAttribute('data-project-name') || '',
+            project_type: card.getAttribute('data-project-type') || '',
+            sector: card.getAttribute('data-sector') || '',
+            sqft: card.getAttribute('data-sqft') || '',
+            levels: card.getAttribute('data-levels') || '',
+            partition_density: card.getAttribute('data-partition-density') || '',
+            site_condition: card.getAttribute('data-site-condition') || '',
+            interior: card.getAttribute('data-interior') || '',
+            exterior: card.getAttribute('data-exterior') || '',
+            roof: card.getAttribute('data-roof') || '',
+            coverage: card.getAttribute('data-coverage') || '',
+            scan_count: card.getAttribute('data-scan-count') || '',
+            timestamp: card.getAttribute('data-timestamp') || ''
+        }));
+    }
+
+    if (exportButton) {
+        exportButton.addEventListener('click', async () => {
+            const projects = getVisibleProjects();
+            if (!projects.length) {
+                alert('There are no visible projects to export.');
+                return;
+            }
+
+            exportButton.disabled = true;
+            exportButton.textContent = 'Preparing...';
+            try {
+                const response = await fetch('/export', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        format: exportFormat ? exportFormat.value : 'xlsx',
+                        projects
+                    })
+                });
+                if (!response.ok) {
+                    const result = await response.json();
+                    throw new Error(result.error || 'The export could not be created.');
+                }
+
+                const blob = await response.blob();
+                const downloadUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = exportFormat?.value === 'csv' ? 'scan-projects-filtered.csv' : 'scan-projects-filtered.xlsx';
+                link.click();
+                URL.revokeObjectURL(downloadUrl);
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                exportButton.disabled = false;
+                exportButton.textContent = 'Download';
+            }
+        });
     }
 
     function deleteJob(projectName, buttonElement) {

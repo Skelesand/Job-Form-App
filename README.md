@@ -2,6 +2,25 @@
 
 ### This is a web app designed to efficiently log and track data from 3D laser scanning jobs for The Wassi Group.
 
+## Database setup
+
+The app now stores projects in SQLite at `data/scan_jobs.db` by default. The original
+Excel workbook is retained as a backup and is only used by the one-time importer.
+
+Install dependencies and initialize the database:
+
+```powershell
+pip install -r requirements.txt
+python import_excel.py --excel data/Scan_Log_Dataset.xlsx --dry-run
+python import_excel.py --excel data/Scan_Log_Dataset.xlsx
+python app.py
+```
+
+Set `DATABASE_URL` to use another database supported by SQLAlchemy, such as a
+PostgreSQL connection string. The importer validates required fields and reports
+duplicate project names before writing. Do not remove the original workbook until
+the imported row count and values have been verified.
+
 
 Proof of concept goals:
 - Display each stored project and its features/information ✅

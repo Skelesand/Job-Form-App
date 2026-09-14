@@ -1,0 +1,11 @@
+{
+    "sqltools.useNodeRuntime": true,
+    "sqltools.connections": [
+        {
+            "previewLimit": 1000,
+            "driver": "SQLite",
+            "name": "ScanDataLog",
+            "database": "${workspaceFolder:Job-Form-App}/data/scan_jobs.db"
+        }
+    ]
+}

@@ -110,6 +110,19 @@ button:hover {
     gap: 8px;
 }
 
+.dashboard-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.export-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .sort-label {
     font-size: 0.95rem;
     color: var(--color-text-secondary);
@@ -119,6 +132,10 @@ button:hover {
 .sort-select {
     min-width: 210px;
     margin-top: 0;
+}
+
+.export-controls .sort-select {
+    min-width: 135px;
 }
 
 .dashboard-scroll-area {

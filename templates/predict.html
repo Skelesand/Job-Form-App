@@ -5,7 +5,7 @@
 {% block content %}
 <div class="form-container prediction-page">
     <h2>Estimate Scan Count</h2>
-    <div class="subtitle">Enter the planned job details to compare it with similar projects.</div>
+    <div class="subtitle">Enter the planned job details to compare it with similar projects of the same type.</div>
 
     <form id="prediction_form">
         <label for="project_type">Project Type</label>
@@ -122,7 +122,7 @@
                 item.textContent = `${match.project_name}: ${match.scan_count} scans (${match.influence}% influence)`;
                 matchesList.appendChild(item);
             });
-            predictionStatus.textContent = 'Estimate based on the current form values.';
+            predictionStatus.textContent = `Estimate based on ${formValues.project_type.toLowerCase()} projects only.`;
             predictionResult.hidden = false;
         } catch (error) {
             predictionStatus.textContent = error.message;

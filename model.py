@@ -6,6 +6,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error
+from sklearn.ensemble import RandomForestRegressor
 
 '''
 Global config & settings
@@ -16,7 +17,7 @@ The higher the weight the more distance it will put between itself
 and any neighbors that do not have the same value of that feature
 '''
 
-# 10, 10, 5, 5, 3, 4, 7, 1.5, 1.5
+
 FEATURE_WEIGHTS = {
     'Project Type': 22.41,
     'Sector': 10.99,
@@ -29,7 +30,6 @@ FEATURE_WEIGHTS = {
     'Roof': 1.90
 }
 
-PROJECT_TYPE_FILTER = 'building'
 CATEGORICAL_COLS = ['Project Type', 'Sector', 'Interior', 'Exterior', 'Roof']
 NUMERIC_COLS = ['Sqft_Log', 'Levels', 'Partition Density', 'Site Condition']
 REQUIRED_INPUT_COLUMNS = CATEGORICAL_COLS + ['Sqft', 'Levels', 'Partition Density', 'Site Condition']
@@ -52,6 +52,83 @@ def validate_required_columns(df, required_columns):
         raise ValueError(f"Missing required columns for model input: {missing}")
 
 
+def prepare_model_features(df):
+    """Normalize raw feature columns so the model can validate and train on the same schema."""
+    df = df.copy()
+    if 'Sqft' in df.columns:
+        df['Sqft'] = pd.to_numeric(df['Sqft'], errors='coerce').fillna(1.0)
+        df.loc[df['Sqft'] <= 0, 'Sqft'] = 1.0
+        df['Sqft_Log'] = np.log1p(df['Sqft'])
+
+    for col in CATEGORICAL_COLS:
+        if col in df.columns:
+            df[col] = clean_text_values(df[col])
+
+    for col in NUMERIC_COLS:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    return df
+
+
+def validate_training_data(df):
+    """Validate that the training data has the fields and minimum quality needed for prediction."""
+    required = [
+        'Project Type', 'Sector', 'Sqft', 'Levels', 'Partition Density',
+        'Site Condition', 'Interior', 'Exterior', 'Roof', 'Coverage', 'Total Scans'
+    ]
+    validate_required_columns(df, required)
+
+    if df.empty:
+        raise ValueError('Training data is empty.')
+
+    if df['Total Scans'].dropna().empty:
+        raise ValueError('No valid Total Scans values are available.')
+
+    numeric_fields = ['Sqft', 'Levels', 'Partition Density', 'Site Condition', 'Coverage', 'Total Scans']
+    for field in numeric_fields:
+        if field in df.columns:
+            converted = pd.to_numeric(df[field], errors='coerce')
+            if converted.isna().all():
+                raise ValueError(f'Column {field} does not contain usable numeric data.')
+
+    if 'Project Type' in df.columns:
+        types = df['Project Type'].dropna().astype(str).str.strip().str.lower()
+        if types.empty:
+            raise ValueError('Project Type column is empty.')
+
+    return True
+
+
+def decide_validation_strategy(df, min_records_for_prediction=10, min_records_for_split=20):
+    """Choose a validation strategy based on data availability and project-type sample size."""
+    validate_training_data(df)
+    total_records = len(df)
+
+    if total_records < min_records_for_prediction:
+        return {
+            'eligible': False,
+            'strategy': 'insufficient_data',
+            'message': f'At least {min_records_for_prediction} valid records are required before predictions can be trusted.',
+            'record_count': total_records,
+        }
+
+    if total_records < min_records_for_split:
+        return {
+            'eligible': True,
+            'strategy': 'leave_one_out',
+            'message': 'Dataset is small; leave-one-out validation is the safest available option.',
+            'record_count': total_records,
+        }
+
+    return {
+        'eligible': True,
+        'strategy': 'k_fold',
+        'message': 'Dataset is large enough for grouped cross-validation.',
+        'record_count': total_records,
+    }
+
+
 # Measures how tightly clustered historical database entries are to calibrate match strictness
 def calculate_adaptive_gamma(train_weighted_features, n_neighbors=3):
     nn = NearestNeighbors(n_neighbors=n_neighbors + 1, metric='cosine')
@@ -68,19 +145,20 @@ def calculate_confidence(avg_distance, gamma):
 
 
 # Opens tracking sheets, filters empty rows, and isolates coverage from raw square footage
-def load_and_prepare_data():
+def load_and_prepare_data(project_type=None, filepath=None):
+    data_path = filepath or file_path
     try:
-        df = pd.read_excel(file_path)
+        df = pd.read_excel(data_path)
     except FileNotFoundError:
         try:
-            df = pd.read_csv(file_path)
+            df = pd.read_csv(data_path)
         except FileNotFoundError as exc:
-            raise FileNotFoundError(f"Data file not found at: {file_path}") from exc
+            raise FileNotFoundError(f"Data file not found at: {data_path}") from exc
     except ValueError:
         try:
-            df = pd.read_csv(file_path)
+            df = pd.read_csv(data_path)
         except Exception as exc:
-            raise ValueError(f"Could not read data file at {file_path}") from exc
+            raise ValueError(f"Could not read data file at: {data_path}") from exc
 
     # Validate and clean Total Scans
     df['Total Scans'] = pd.to_numeric(df['Total Scans'], errors='coerce')
@@ -113,15 +191,122 @@ def load_and_prepare_data():
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
-    # Limiting scope to the configured project type. Use None to disable this filter.
-    if 'Project Type' in df.columns and PROJECT_TYPE_FILTER is not None:
-        df = df[df['Project Type'] == PROJECT_TYPE_FILTER]
+    # Keep comparisons within the requested project type.
+    if 'Project Type' in df.columns and project_type is not None:
+        normalized_type = clean_text_values(pd.Series([project_type])).iloc[0]
+        df = df[df['Project Type'] == normalized_type]
 
     return df.reset_index(drop=True)
 
 
+def load_and_prepare_records(records, project_type=None):
+    """Prepare database records using the same transformations as Excel data."""
+    df = pd.DataFrame(records)
+    if df.empty:
+        return df
+
+    df['Total Scans'] = pd.to_numeric(df['Total Scans'], errors='coerce')
+    df = df.dropna(subset=['Total Scans'])
+    df = df[df['Total Scans'] > 0].copy()
+    df['Coverage'] = pd.to_numeric(df.get('Coverage', 1.0), errors='coerce').fillna(1.0)
+    df.loc[df['Coverage'] <= 0, 'Coverage'] = 1.0
+    df['Raw_Scans_Actual'] = df['Total Scans']
+    df['Sqft'] = pd.to_numeric(df['Sqft'], errors='coerce').fillna(1.0)
+    df.loc[df['Sqft'] <= 0, 'Sqft'] = 1.0
+    df['Sqft_Log'] = np.log1p(df['Sqft'])
+    df['Scanned_Sqft'] = df['Sqft'] * df['Coverage']
+
+    for col in CATEGORICAL_COLS:
+        if col in df.columns:
+            df[col] = clean_text_values(df[col])
+    for col in NUMERIC_COLS:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    if 'Project Type' in df.columns and project_type is not None:
+        normalized_type = clean_text_values(pd.Series([project_type])).iloc[0]
+        df = df[df['Project Type'] == normalized_type]
+    return df.reset_index(drop=True)
+
+
+def _detect_feature_family(feature_name):
+    """Map transformed feature names back to their conceptual family."""
+    normalized = feature_name.lower()
+    if 'project type' in normalized:
+        return 'Project Type'
+    if 'sector' in normalized:
+        return 'Sector'
+    if 'interior' in normalized:
+        return 'Interior'
+    if 'exterior' in normalized:
+        return 'Exterior'
+    if 'roof' in normalized:
+        return 'Roof'
+    if 'sqft' in normalized:
+        return 'Sqft_Log'
+    if 'levels' in normalized:
+        return 'Levels'
+    if 'partition density' in normalized:
+        return 'Partition Density'
+    if 'site condition' in normalized:
+        return 'Site Condition'
+    return None
+
+
+def learn_feature_weights(feature_names, X_processed, target_values):
+    """Learn a weight vector from historical scan counts and fall back to the legacy static weights if needed."""
+    if len(target_values) < 5 or X_processed.shape[1] == 0:
+        return np.ones(len(feature_names), dtype=float)
+
+    try:
+        model = RandomForestRegressor(
+            n_estimators=200,
+            random_state=42,
+            min_samples_leaf=max(1, min(3, len(target_values) // 20))
+        )
+        model.fit(X_processed, np.log1p(np.asarray(target_values, dtype=float)))
+        importances = model.feature_importances_
+        if not np.all(np.isfinite(importances)) or np.sum(importances) <= 0:
+            raise ValueError('Importance values are invalid.')
+
+        family_importances = {}
+        for name, importance in zip(feature_names, importances):
+            family = _detect_feature_family(name)
+            if family is None:
+                continue
+            family_importances.setdefault(family, []).append(float(importance))
+
+        if not family_importances:
+            raise ValueError('No feature families were recognized for weighting.')
+
+        weights = np.ones(len(feature_names), dtype=float)
+        for i, name in enumerate(feature_names):
+            family = _detect_feature_family(name)
+            if family is None:
+                continue
+            weights[i] = float(np.mean(family_importances[family]))
+
+        weights = np.clip(weights, 0.25, 5.0)
+        weights = weights / np.mean(weights)
+        return weights
+    except Exception:
+        legacy_weights = np.ones(len(feature_names), dtype=float)
+        for i, name in enumerate(feature_names):
+            for feature, weight in FEATURE_WEIGHTS.items():
+                if feature in name:
+                    if name.startswith('cat__'):
+                        prefix = name.split('__')[1].split('_')[0]
+                        cat_family_size = sum(1 for f in feature_names if f.startswith(f'cat__{prefix}'))
+                        legacy_weights[i] = weight / np.sqrt(max(cat_family_size, 1))
+                    else:
+                        legacy_weights[i] = weight
+                    break
+        return legacy_weights
+
+
 # Similarity Engine Builder
 def build_similarity_engine(df):
+    df = prepare_model_features(df)
     validate_required_columns(df, CATEGORICAL_COLS + NUMERIC_COLS)
     X = df[CATEGORICAL_COLS + NUMERIC_COLS].copy()
 
@@ -143,19 +328,7 @@ def build_similarity_engine(df):
 
     X_processed = preprocessor.fit_transform(X)
     feature_names = preprocessor.get_feature_names_out()
-
-    # Generate an equalized structural weight array
-    weight_vector = np.ones(len(feature_names))
-    for i, name in enumerate(feature_names):
-        for feature, weight in FEATURE_WEIGHTS.items():
-            if feature in name:
-                if name.startswith('cat__'):
-                    prefix = name.split('__')[1].split('_')[0]
-                    cat_family_size = sum(1 for f in feature_names if f.startswith(f'cat__{prefix}'))
-                    weight_vector[i] = weight / np.sqrt(max(cat_family_size, 1))
-                else:
-                    weight_vector[i] = weight
-                break
+    weight_vector = learn_feature_weights(feature_names, X_processed, df['Total Scans'].values)
 
     X_weighted = X_processed * weight_vector
 
@@ -240,7 +413,12 @@ def find_lookalike_jobs(new_job_df, historical_df, nn_model, preprocessor, weigh
 
 # Leave-One-Out Validation Engine
 def evaluate_via_cross_validation(df, n_neighbors=3):
-    print(f"Starting Leave-One-Out Validation across {len(df)} total building records...")
+    strategy = decide_validation_strategy(df)
+    if not strategy['eligible']:
+        raise ValueError(strategy['message'])
+
+    validation_strategy = strategy['strategy']
+    print(f"Starting {validation_strategy} validation across {len(df)} records...")
 
     actual_scans, predicted_scans, job_names, confidences = [], [], [], []
 
@@ -278,6 +456,7 @@ def evaluate_via_cross_validation(df, n_neighbors=3):
     print("\n==================================================")
     print("              OVERALL VALIDATION METRICS          ")
     print("==================================================")
+    print(f"Validation Strategy: {validation_strategy}")
     print(f"Mean Absolute Error: {mae:.1f} Scans")
     print(f"Mean Absolute Percentage Error: {mape * 100:.2f}%")
     print(f"Total Evaluated Records: {len(actual)}")
@@ -312,6 +491,13 @@ def evaluate_via_cross_validation(df, n_neighbors=3):
     breakdown_df = breakdown_df.drop(columns=['Raw_Confidence'])
 
     print(breakdown_df.head(80).to_string(index=False))
+    return {
+        'strategy': validation_strategy,
+        'record_count': len(actual),
+        'mae': float(mae),
+        'mape': float(mape),
+        'eligible': True,
+    }
 
 
 # Execution Entry Point

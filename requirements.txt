@@ -1,0 +1,7 @@
+Flask
+SQLAlchemy
+openpyxl
+pandas
+numpy
+scikit-learn
+pytest
