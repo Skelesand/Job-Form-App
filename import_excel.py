@@ -1,5 +1,6 @@
 import argparse
 import datetime as dt
+import json
 from collections import Counter
 
 import pandas as pd
@@ -17,10 +18,12 @@ REQUIRED_COLUMNS = [
 
 
 def normalize_name(value):
+    """Normalize a project name for comparison with other names."""
     return validation.project_identity(value)
 
 
 def parse_row(row, row_number):
+    """Convert one workbook row into validated project data with a useful row error."""
     values = {
         "project_name": row["Project Name"],
         "project_type": str(row["Project Type"]).strip(),
@@ -34,6 +37,7 @@ def parse_row(row, row_number):
         "roof": row["Roof"],
         "coverage": float(row["Coverage"]),
         "scan_count": int(float(row["Total Scans"])),
+        "tags": row.get("Tags", ""),
     }
     try:
         return validation.validate_project(values)
@@ -42,6 +46,7 @@ def parse_row(row, row_number):
 
 
 def inspect_workbook(excel_path):
+    """Read a workbook and report valid rows, validation errors, and duplicate names."""
     dataframe = pd.read_excel(excel_path)
     missing_columns = [column for column in REQUIRED_COLUMNS if column not in dataframe.columns]
     if missing_columns:
@@ -61,6 +66,7 @@ def inspect_workbook(excel_path):
 
 
 def import_workbook(excel_path, database_url=None, dry_run=False):
+    """Inspect a workbook and import its valid rows unless errors or dry-run mode stop it."""
     rows, errors, duplicate_names = inspect_workbook(excel_path)
     report = {
         "rows": len(rows),
@@ -93,6 +99,7 @@ def import_workbook(excel_path, database_url=None, dry_run=False):
             project_values["interior"] = db.normalize_bool(values["interior"])
             project_values["exterior"] = db.normalize_bool(values["exterior"])
             project_values["roof"] = db.normalize_bool(values["roof"])
+            project_values["tags"] = json.dumps(values["tags"], ensure_ascii=True)
             project = db.Project(
                 **project_values,
                 created_at=dt.datetime.now(dt.UTC),
@@ -106,6 +113,7 @@ def import_workbook(excel_path, database_url=None, dry_run=False):
 
 
 def main():
+    """Run the workbook import command using values supplied on the command line."""
     parser = argparse.ArgumentParser(description="Import scan jobs from the legacy Excel workbook.")
     parser.add_argument("--excel", default="data/Scan_Log_Dataset.xlsx")
     parser.add_argument("--database-url", default=None)

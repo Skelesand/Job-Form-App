@@ -1,8 +1,9 @@
 import datetime as dt
+import json
 import os
 from pathlib import Path
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, Integer, String, create_engine, event, func, select
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, Integer, String, Text, create_engine, event, func, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 import validation
 
@@ -39,6 +40,7 @@ class Project(Base):
     roof: Mapped[bool] = mapped_column(Boolean)
     coverage: Mapped[float] = mapped_column(Float)
     scan_count: Mapped[int] = mapped_column(Integer)
+    tags: Mapped[str | None] = mapped_column(Text, nullable=True, default="[]")
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=lambda: dt.datetime.now(dt.UTC))
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime, default=lambda: dt.datetime.now(dt.UTC), onupdate=lambda: dt.datetime.now(dt.UTC))
 
@@ -48,6 +50,7 @@ _Session = None
 
 
 def get_engine(database_url=None):
+    """Create or reuse the database engine for the requested database URL."""
     global _engine
     url = database_url or DATABASE_URL
     if _engine is None or str(_engine.url) != url:
@@ -60,6 +63,7 @@ def get_engine(database_url=None):
         if url.startswith("sqlite"):
             @event.listens_for(_engine, "connect")
             def configure_sqlite(dbapi_connection, connection_record):
+                """Enable SQLite foreign keys and give busy connections time to finish."""
                 cursor = dbapi_connection.cursor()
                 cursor.execute("PRAGMA foreign_keys=ON")
                 cursor.execute("PRAGMA busy_timeout=10000")
@@ -68,6 +72,7 @@ def get_engine(database_url=None):
 
 
 def get_session_factory(database_url=None):
+    """Create or reuse the SQLAlchemy session factory for the database engine."""
     global _Session
     engine = get_engine(database_url)
     if _Session is None or _Session.kw.get("bind") is not engine:
@@ -76,16 +81,36 @@ def get_session_factory(database_url=None):
 
 
 def init_db(database_url=None):
-    Base.metadata.create_all(get_engine(database_url))
+    """Create the project table and add the tags column to older SQLite databases."""
+    engine = get_engine(database_url)
+    Base.metadata.create_all(engine)
+    if engine.dialect.name == "sqlite":
+        with engine.begin() as connection:
+            columns = connection.execute(text("PRAGMA table_info(projects)")).fetchall()
+            if not any(column[1] == "tags" for column in columns):
+                connection.execute(text("ALTER TABLE projects ADD COLUMN tags TEXT DEFAULT '[]'"))
+
+
+def decode_tags(value):
+    """Turn stored tag data into a validated list, returning an empty list when invalid."""
+    if not value:
+        return []
+    try:
+        tags = json.loads(value) if isinstance(value, str) else value
+        return validation.parse_tags(tags) if isinstance(tags, (list, tuple)) else []
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return []
 
 
 def normalize_bool(value):
+    """Convert common text and numeric true values into a Boolean."""
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() in {"y", "yes", "true", "1", "1.0"}
 
 
 def project_to_dict(project):
+    """Convert a database project into the fields used by the web interface."""
     return {
         "id": project.id,
         "project_name": project.project_name,
@@ -100,11 +125,13 @@ def project_to_dict(project):
         "roof": "y" if project.roof else "n",
         "coverage": project.coverage,
         "scan_count": project.scan_count,
+        "tags": decode_tags(project.tags),
         "timestamp": project.updated_at.strftime("%Y-%m-%d %H:%M:%S") if project.updated_at else "",
     }
 
 
 def project_to_model_row(project):
+    """Convert a database project into the column names expected by the model."""
     return {
         "Project Name": project.project_name,
         "Project Type": project.project_type,
@@ -122,6 +149,7 @@ def project_to_model_row(project):
 
 
 def list_projects(database_url=None):
+    """Return all saved projects in database order."""
     init_db(database_url)
     with get_session_factory(database_url)() as session:
         projects = session.scalars(select(Project).order_by(Project.id)).all()
@@ -129,10 +157,12 @@ def list_projects(database_url=None):
 
 
 def project_names(database_url=None):
+    """Return the saved project names in alphabetical order."""
     return sorted(project["project_name"] for project in list_projects(database_url))
 
 
 def get_project(project_name, database_url=None):
+    """Find one project by name and return its web-format data."""
     init_db(database_url)
     with get_session_factory(database_url)() as session:
         identity = validation.project_identity(project_name)
@@ -141,6 +171,7 @@ def get_project(project_name, database_url=None):
 
 
 def get_projects_by_ids(project_ids, database_url=None):
+    """Return the requested projects in the same order as their identifiers."""
     init_db(database_url)
     with get_session_factory(database_url)() as session:
         projects = session.scalars(select(Project).where(Project.id.in_(project_ids))).all()
@@ -149,6 +180,7 @@ def get_projects_by_ids(project_ids, database_url=None):
 
 
 def get_training_rows(project_type=None, database_url=None):
+    """Return database projects as model rows, optionally filtered by project type."""
     init_db(database_url)
     with get_session_factory(database_url)() as session:
         statement = select(Project).order_by(Project.id)
@@ -161,6 +193,7 @@ def get_training_rows(project_type=None, database_url=None):
 
 
 def upsert_project(values, database_url=None):
+    """Validate and create or update a project in the database."""
     values = validation.validate_project(values)
     init_db(database_url)
     with get_session_factory(database_url)() as session:
@@ -174,12 +207,14 @@ def upsert_project(values, database_url=None):
         project.interior = normalize_bool(values["interior"])
         project.exterior = normalize_bool(values["exterior"])
         project.roof = normalize_bool(values["roof"])
+        project.tags = json.dumps(values["tags"], ensure_ascii=True)
         project.updated_at = dt.datetime.now(dt.UTC)
         session.commit()
         return project_to_dict(project)
 
 
 def delete_project(project_name, database_url=None):
+    """Delete the project with the given name and report whether it existed."""
     init_db(database_url)
     with get_session_factory(database_url)() as session:
         project = session.scalar(select(Project).where(Project.project_name == project_name.strip()))
@@ -191,6 +226,7 @@ def delete_project(project_name, database_url=None):
 
 
 def delete_project_by_id(project_id, database_url=None):
+    """Delete the project with the given identifier and report whether it existed."""
     init_db(database_url)
     with get_session_factory(database_url)() as session:
         project = session.get(Project, project_id)

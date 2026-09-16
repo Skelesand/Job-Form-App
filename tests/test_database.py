@@ -14,16 +14,19 @@ PROJECT = {
     "roof": "n",
     "coverage": 0.9,
     "scan_count": 12,
+    "tags": "windmill_blade, Exterior, windmill_blade",
 }
 
 
 def test_project_repository_crud(tmp_path):
+    """Verify that projects can be created, updated, read, and deleted."""
     database_url = f"sqlite:///{tmp_path / 'projects.db'}"
     db.init_db(database_url)
 
     created = db.upsert_project(PROJECT, database_url)
     assert created["project_name"] == PROJECT["project_name"]
     assert created["interior"] == "y"
+    assert created["tags"] == ["windmill_blade", "Exterior"]
     assert db.project_names(database_url) == [PROJECT["project_name"]]
     assert db.get_project(PROJECT["project_name"], database_url)["scan_count"] == 12
 
@@ -31,12 +34,17 @@ def test_project_repository_crud(tmp_path):
     db.upsert_project(updated, database_url)
     assert db.get_project(PROJECT["project_name"], database_url)["scan_count"] == 18
 
+    cleared = {**PROJECT, "tags": ""}
+    db.upsert_project(cleared, database_url)
+    assert db.get_project(PROJECT["project_name"], database_url)["tags"] == []
+
     assert db.delete_project(PROJECT["project_name"], database_url) is True
     assert db.get_project(PROJECT["project_name"], database_url) is None
     assert db.delete_project(PROJECT["project_name"], database_url) is False
 
 
 def test_database_constraints_reject_invalid_project(tmp_path):
+    """Verify that the database rejects a project with invalid square footage."""
     database_url = f"sqlite:///{tmp_path / 'constraints.db'}"
     db.init_db(database_url)
     invalid_project = {**PROJECT, "sqft": 0}

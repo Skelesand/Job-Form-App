@@ -4,6 +4,7 @@ import backup
 
 
 def test_backup_and_restore_preserve_data(tmp_path):
+    """Verify that backing up and restoring keeps the stored project data."""
     source = tmp_path / "source.db"
     backup_path = tmp_path / "backups" / "scan_jobs-test.db"
     restored = tmp_path / "restored.db"

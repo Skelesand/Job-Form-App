@@ -469,14 +469,24 @@ summary::-webkit-details-marker {
     justify-content: space-between;
 }
 
+.delete-form {
+    display: flex;
+    flex: 1;
+}
+
 .btn-delete,
 .btn-edit {
     flex: 1;
+    display: block;
     padding: 10px 15px;
     border: none;
     border-radius: 4px;
     font-size: 14px;
     font-weight: bold;
+    text-align: center;
+    text-decoration: none;
+    box-sizing: border-box;
+    margin-top: 0;
     cursor: pointer;
     transition: background-color 0.2s ease;
 }
@@ -604,4 +614,8 @@ body, html {
     padding: 30px;
     background-color: var(--color-bg-light);
     box-sizing: border-box;
+}
+
+.delete-form .btn-delete {
+    width: 100%;
 }

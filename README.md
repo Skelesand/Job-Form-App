@@ -14,7 +14,7 @@ $env:SECRET_KEY = "local-development-secret"
 .\.venv\Scripts\python.exe app.py
 ```
 
-The app uses SQLite at `data/scan_jobs.db` by default. SQLite is the source of truth; Excel is used only for explicit imports and exports.
+The app uses SQLite at `data/scan_jobs.db` by default.
 
 ## Internal deployment
 
@@ -41,6 +41,16 @@ Keep backups outside the application source folder when possible, apply a retent
 ## Excel imports
 
 Use `import_excel.py` for explicit imports. Run with `--dry-run` first; invalid rows and case-insensitive duplicate project names prevent a commit. A successful import is transactional.
+
+## Project tags
+
+Each project can have its own optional comma-separated tag list, for example:
+
+```text
+windmill_blade, exterior_only, industrial
+```
+
+Tags are stored on the individual project and are not shared with project types or sectors. Tags are deduplicated case-insensitively within that project, while the first entered spelling is preserved. Leaving the field blank clears the project's tags. The dashboard filters one tag query at a time using case-insensitive substring matching, so `test` matches a tag such as `Testing`. Exports include a `Tags` column. Excel imports may include an optional `Tags` column; commas separate tags and are not allowed inside a tag label.
 
 
 Proof of concept goals:

@@ -33,6 +33,7 @@ _prediction_cache = {
 
 @app.after_request
 def add_security_headers(response):
+    """Add browser security headers to every response."""
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
@@ -41,6 +42,7 @@ def add_security_headers(response):
 
 @app.errorhandler(400)
 def handle_bad_request(error):
+    """Return a JSON or HTML response for a malformed request."""
     if request.is_json:
         return jsonify({"success": False, "error": "The request could not be processed."}), 400
     return render_template("error.html", status_code=400, message="The request could not be processed."), 400
@@ -48,6 +50,7 @@ def handle_bad_request(error):
 
 @app.errorhandler(404)
 def handle_not_found(error):
+    """Return a JSON or HTML response when a requested page is missing."""
     if request.is_json:
         return jsonify({"success": False, "error": "The requested resource was not found."}), 404
     return render_template("error.html", status_code=404, message="The requested page was not found."), 404
@@ -55,6 +58,7 @@ def handle_not_found(error):
 
 @app.errorhandler(500)
 def handle_server_error(error):
+    """Log an unexpected error and return a JSON or HTML error response."""
     logger.exception("Unhandled application error")
     if request.is_json:
         return jsonify({"success": False, "error": "An unexpected server error occurred."}), 500
@@ -63,6 +67,8 @@ def handle_server_error(error):
 
 def spreadsheet_safe(value):
     """Prevent exported text from being interpreted as a spreadsheet formula."""
+    if isinstance(value, (list, tuple)):
+        value = ", ".join(str(item) for item in value)
     if isinstance(value, str) and value.startswith(("=", "+", "-", "@")):
         return "'" + value
     return value
@@ -104,6 +110,7 @@ def form():
 
 @app.route("/get_project_data")
 def get_project_data():
+    """Return the saved details for the project named in the request."""
     project_name = request.args.get("name")
     if not project_name:
         return jsonify({"success": False, "error": "No project name provided"})
@@ -137,11 +144,13 @@ def export_projects():
         "Project Name", "Project Type", "Sector", "Square Footage", "Levels",
         "Partition Density", "Site Condition", "Interior Scanned", "Exterior Scanned",
         "Roof Scanned", "Coverage", "Total Scans", "Updated",
+        "Tags",
     ]
     rows = [[spreadsheet_safe(project.get(key, "")) for key in [
         "project_name", "project_type", "sector", "sqft", "levels",
         "partition_density", "site_condition", "interior", "exterior",
         "roof", "coverage", "scan_count", "timestamp",
+        "tags",
     ]] for project in projects if isinstance(project, dict)]
     if not rows:
         return jsonify({"success": False, "error": "There are no visible projects to export."}), 400
@@ -252,9 +261,14 @@ def predict():
 
 @app.route("/delete", methods=["POST"])
 def delete_project():
+    """Delete a project by identifier and clear cached predictions."""
     try:
         data = request.get_json(silent=True) or {}
-        project_id = int(data.get("id"))
+        project_id = data.get("id")
+        if project_id is None and data.get("project_name"):
+            legacy_project = db.get_project(data["project_name"], DATABASE_URL)
+            project_id = legacy_project["id"] if legacy_project else None
+        project_id = int(project_id)
         
         if project_id <= 0:
             raise ValueError
@@ -272,15 +286,34 @@ def delete_project():
         return jsonify({"success": False, "error": "The project could not be deleted."}), 500
 
 
+@app.route("/delete/<int:project_id>", methods=["POST"])
+def delete_project_form(project_id):
+    """Delete a project from the form route and redirect to the dashboard."""
+    try:
+        if not db.delete_project_by_id(project_id, DATABASE_URL):
+            return redirect(url_for("home"))
+        _prediction_cache["engines"] = {}
+        return redirect(url_for("home"))
+    except Exception:
+        logger.exception("Form delete failed")
+        return render_template("error.html", status_code=500, message="The project could not be deleted."), 500
+
+
 @app.route("/submit", methods=["POST"])
 def submit():
+    """Validate and save a submitted project, or return its errors to the form."""
     try:
         values = validation.validate_project(request.form.to_dict())
         db.upsert_project(values, DATABASE_URL)
         _prediction_cache["engines"] = {}
         return redirect(url_for("home"))
     except validation.ValidationError as exc:
-        return render_template("form.html", projects=db.project_names(DATABASE_URL), errors=exc.errors), 400
+        return render_template(
+            "form.html",
+            projects=db.project_names(DATABASE_URL),
+            errors=exc.errors,
+            form_values=request.form.to_dict(),
+        ), 400
     except Exception as exc:
         logger.exception("Unexpected error in /submit")
         return render_template("error.html", status_code=500, message="The job could not be saved."), 500

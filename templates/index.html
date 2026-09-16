@@ -42,6 +42,7 @@
                             <details class="project-card"
                                      data-project-id="{{ job.id }}"
                                      data-project-name="{{ job.project_name|default('')|string }}"
+                                     data-tags='{{ job.tags|default([])|tojson }}'
                                      data-project-type="{{ job.project_type|default('')|string }}"
                                      data-sector="{{ job.sector|default('')|string }}"
                                      data-sqft="{{ job.sqft|default('')|string }}"
@@ -62,6 +63,9 @@
                                     <div class="grid">
                                         <div class="grid-item"><strong>Project Type:</strong> {{ job.project_type }}</div>
                                         <div class="grid-item"><strong>Sector:</strong> {{ job.sector }}</div>
+                                        {% if job.tags %}
+                                            <div class="grid-item"><strong>Tags:</strong> {{ job.tags|join(', ') }}</div>
+                                        {% endif %}
                                         <div class="grid-item"><strong>Square Footage:</strong> {{ job.sqft }} sqft</div>
                                         <div class="grid-item"><strong>Levels:</strong> {{ job.levels }}</div>
                                         <div class="grid-item"><strong>Partition Density:</strong> {{ job.partition_density }}</div>
@@ -78,8 +82,11 @@
                                         <div class="grid-item"><strong>Total Scans:</strong> {{ job.scan_count }}</div>
                                     </div>
                                     <div class="card-actions">
-                                        <button class="btn-delete" type="button">Delete Project</button>
-                                        <button class="btn-edit" type="button">Edit Project</button>
+                                        <form class="delete-form" data-project-name="{{ job.project_name|default('')|string }}" action="{{ url_for('delete_project_form', project_id=job.id) }}" method="POST">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button class="btn-delete" type="submit">Delete Project</button>
+                                        </form>
+                                        <a class="btn-edit" href="{{ url_for('form', project=job.project_name) }}">Edit Project</a>
                                     </div>
                                 </div>
                             </details>
@@ -103,6 +110,11 @@
             <div class="filter-group">
                 <label class="filter-group-title" for="dashboard_search">Project Name</label>
                 <input type="text" id="dashboard_search" placeholder="Search by name..." autocomplete="off">
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-group-title" for="filter_tags">Project Tags</label>
+                <input type="text" id="filter_tags" placeholder="windmill_blade" autocomplete="off">
             </div>
 
             <div class="filter-group">
@@ -163,6 +175,7 @@
     const searchInput = document.getElementById('dashboard_search');
     const projectTypeInput = document.getElementById('filter_project_type');
     const sectorInput = document.getElementById('filter_sector');
+    const tagsInput = document.getElementById('filter_tags');
     const clearFiltersButton = document.getElementById('clear_filters');
     const addFeatureButton = document.getElementById('add_feature_filter');
     const addNumericButton = document.getElementById('add_numeric_filter');
@@ -372,6 +385,7 @@
         const textFilter = searchInput ? searchInput.value.trim().toLowerCase() : '';
         const projectTypeFilter = projectTypeInput ? projectTypeInput.value.trim().toLowerCase() : '';
         const sectorFilter = sectorInput ? sectorInput.value.trim().toLowerCase() : '';
+        const tagFilter = tagsInput ? tagsInput.value.trim().toLowerCase() : '';
 
         const activeFeatureRows = featureFilterRows ? Array.from(featureFilterRows.querySelectorAll('.filter-row')).filter(row => {
             const field = row.querySelector('.feature-field')?.value || '';
@@ -386,7 +400,7 @@
             return field && operator && value !== '';
         }) : [];
 
-        const hasActiveFilters = textFilter !== '' || projectTypeFilter !== '' || sectorFilter !== '' || activeFeatureRows.length > 0 || activeNumericRows.length > 0;
+        const hasActiveFilters = textFilter !== '' || projectTypeFilter !== '' || sectorFilter !== '' || tagFilter !== '' || activeFeatureRows.length > 0 || activeNumericRows.length > 0;
 
         let visibleCount = 0;
 
@@ -394,10 +408,17 @@
             const projectName = (card.getAttribute('data-project-name') || '').toLowerCase();
             const projectType = (card.getAttribute('data-project-type') || '').toLowerCase();
             const sector = (card.getAttribute('data-sector') || '').toLowerCase();
+            let projectTags = [];
+            try {
+                projectTags = JSON.parse(card.getAttribute('data-tags') || '[]').map(tag => String(tag).toLowerCase());
+            } catch (error) {
+                projectTags = [];
+            }
 
             const matchesName = projectName.indexOf(textFilter) > -1;
             const matchesProjectType = projectTypeFilter === '' || projectType.indexOf(projectTypeFilter) > -1;
             const matchesSector = sectorFilter === '' || sector.indexOf(sectorFilter) > -1;
+            const matchesTags = tagFilter === '' || projectTags.some(tag => tag.includes(tagFilter));
 
             const matchesFeatureFilters = activeFeatureRows.every(row => {
                 const field = row.querySelector('.feature-field').value;
@@ -414,7 +435,7 @@
                 return !config || getNumericMatch(card, config.dataKey, operator, value, config.transform);
             });
 
-            if (matchesName && matchesProjectType && matchesSector && matchesFeatureFilters && matchesNumericFilters) {
+            if (matchesName && matchesProjectType && matchesSector && matchesTags && matchesFeatureFilters && matchesNumericFilters) {
                 card.style.display = '';
                 visibleCount++;
             } else {
@@ -467,6 +488,9 @@
             if (sectorInput) {
                 sectorInput.value = '';
             }
+            if (tagsInput) {
+                tagsInput.value = '';
+            }
             if (featureFilterRows) {
                 featureFilterRows.innerHTML = '';
             }
@@ -475,6 +499,10 @@
             }
             filterProjects();
         });
+    }
+
+    if (tagsInput) {
+        tagsInput.addEventListener('input', filterProjects);
     }
 
     filterProjects();
@@ -575,15 +603,20 @@
     }
 
     function deleteJob(projectId, projectName, buttonElement) {
-        const confirmed = confirm(`Are you sure you want to delete "${projectName}"? This action cannot be undone.`);
-        if (!confirmed) return;
+        buttonElement.disabled = true;
 
         fetch('/delete', {
             method: 'POST',
             headers: jsonHeaders(),
             body: JSON.stringify({ id: projectId })
         })
-        .then(response => response.json())
+        .then(async response => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || `Delete failed (${response.status}).`);
+            }
+            return data;
+        })
         .then(data => {
             if (data.success) {
                 alert('Job deleted successfully!');
@@ -600,22 +633,22 @@
         })
         .catch(err => {
             console.error('Error:', err);
-            alert('Error deleting job. Please try again.');
+            buttonElement.disabled = false;
+            alert(err.message || 'Error deleting job. Please try again.');
         });
-    }
-
-    function editJob(projectName) {
-        window.location.href = `/form?project=${encodeURIComponent(projectName)}`;
     }
 
     projectCards.forEach(card => {
         const projectId = card.getAttribute('data-project-id') || '';
         const projectName = card.getAttribute('data-project-name') || '';
-        card.querySelector('.btn-delete')?.addEventListener('click', event => {
-            deleteJob(projectId, projectName, event.currentTarget);
-        });
-        card.querySelector('.btn-edit')?.addEventListener('click', () => {
-            editJob(projectName);
+        card.querySelector('.delete-form')?.addEventListener('submit', event => {
+            const confirmed = window.confirm(`Are you sure you want to delete "${projectName}"? This action cannot be undone.`);
+            if (!confirmed) {
+                event.preventDefault();
+                return;
+            }
+            event.preventDefault();
+            deleteJob(projectId, projectName, event.currentTarget.querySelector('.btn-delete'));
         });
     });
 </script>

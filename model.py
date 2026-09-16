@@ -39,6 +39,7 @@ file_path = 'data\\Scan_Log_Dataset.xlsx'
 
 # Data Standardization Tool
 def clean_text_values(series):
+    """Standardize text values and common yes-or-no spellings in a data series."""
     return series.astype(str).str.strip().str.lower().replace({
         'yes': 'y', 'true': 'y', '1': 'y', '1.0': 'y',
         'no': 'n', 'false': 'n', '0': 'n', '0.0': 'n',
@@ -47,6 +48,7 @@ def clean_text_values(series):
 
 
 def validate_required_columns(df, required_columns):
+    """Raise an error when a data frame is missing any required columns."""
     missing = [col for col in required_columns if col not in df.columns]
     if missing:
         raise ValueError(f"Missing required columns for model input: {missing}")
@@ -129,8 +131,8 @@ def decide_validation_strategy(df, min_records_for_prediction=10, min_records_fo
     }
 
 
-# Measures how tightly clustered historical database entries are to calibrate match strictness
 def calculate_adaptive_gamma(train_weighted_features, n_neighbors=3):
+    """Calculate a confidence scale from the distances between nearby training records."""
     nn = NearestNeighbors(n_neighbors=n_neighbors + 1, metric='cosine')
     nn.fit(train_weighted_features)
     distances, _ = nn.kneighbors(train_weighted_features)
@@ -138,14 +140,15 @@ def calculate_adaptive_gamma(train_weighted_features, n_neighbors=3):
     return 1.0 / (mean_neighbor_dist + 1e-5) if mean_neighbor_dist > 0 else 2.5
 
 
-# Translates mathematical distances into an intuitive 0% to 100% "Prediction Strength" score
 def calculate_confidence(avg_distance, gamma):
+    """Convert an average match distance into a confidence percentage from 0 to 100."""
     confidence = np.exp(-gamma * avg_distance) * 100
     return np.clip(confidence, 0, 100)
 
 
 # Opens tracking sheets, filters empty rows, and isolates coverage from raw square footage
 def load_and_prepare_data(project_type=None, filepath=None):
+    """Load historical scan data, clean its fields, and optionally filter by project type."""
     data_path = filepath or file_path
     try:
         df = pd.read_excel(data_path)
@@ -306,6 +309,7 @@ def learn_feature_weights(feature_names, X_processed, target_values):
 
 # Similarity Engine Builder
 def build_similarity_engine(df):
+    """Build the preprocessing and nearest-neighbor objects used to compare projects."""
     df = prepare_model_features(df)
     validate_required_columns(df, CATEGORICAL_COLS + NUMERIC_COLS)
     X = df[CATEGORICAL_COLS + NUMERIC_COLS].copy()
@@ -413,6 +417,7 @@ def find_lookalike_jobs(new_job_df, historical_df, nn_model, preprocessor, weigh
 
 # Leave-One-Out Validation Engine
 def evaluate_via_cross_validation(df, n_neighbors=3):
+    """Evaluate prediction accuracy by repeatedly comparing each record with the others."""
     strategy = decide_validation_strategy(df)
     if not strategy['eligible']:
         raise ValueError(strategy['message'])

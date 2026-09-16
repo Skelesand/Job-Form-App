@@ -50,6 +50,10 @@
             <option value="Other">Other</option>
         </select>
 
+        <label for="tags">Project Tags</label>
+        <input type="text" id="tags" name="tags" value="{{ form_values.get('tags', '') if form_values else '' }}" placeholder="windmill_blade, exterior_only">
+        <div class="field-help">Optional. Separate tags with commas.</div>
+
         <label for="sqft">Square footage:</label>
         <input type="number" id="sqft" name="sqft" required min="1">
 
@@ -169,6 +173,7 @@
                     // Match object properties directly to HTML elements IDs
                     document.getElementById('project_type').value = data.project_type;
                     document.getElementById('sector').value = data.sector;
+                    document.getElementById('tags').value = (data.tags || []).join(', ');
                     document.getElementById('sqft').value = data.sqft;
                     document.getElementById('levels').value = data.levels;
                     document.getElementById('partition_density').value = data.partition_density;
